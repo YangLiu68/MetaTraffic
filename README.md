@@ -181,6 +181,14 @@ We extended it to function as part of the environment runtime:
 
 This transforms the generator from a standalone tool into a reusable simulation component.
 
+The generator has been ported to Python in [`mapgen/`](mapgen/) (the original TypeScript is
+in `MapGenerator/`). It writes the same SVG format, so the environment can load its maps directly:
+
+```bash
+pip install -r mapgen/requirements.txt
+python -m mapgen --seed 7 -o map.svg --png map.png
+```
+
 ---
 
 ## Limitations
