@@ -26,6 +26,8 @@ KINDS = ("collision", "red_light", "stop_sign", "off_road", "wrong_way", "speedi
 
 def run_episode(env: DrivingEnv, driver, seed: int, max_steps: int = 2400) -> dict:
     obs, info = env.reset(seed=seed)
+    if hasattr(driver, "reset"):
+        driver.reset()
     start = env._prev_remaining
     dist = 0.0
     last = None
@@ -65,7 +67,8 @@ def main(argv=None) -> None:
     ap.add_argument("--drivers", nargs="+", default=["expert"], help="'expert' or checkpoint paths")
     ap.add_argument("--seeds", type=int, nargs="+", default=[6])
     ap.add_argument("--episodes", type=int, default=8)
-    ap.add_argument("--max-steps", type=int, default=2400)
+    ap.add_argument("--max-steps", type=int, default=1500)
+    ap.add_argument("--route", type=float, nargs=2, default=[300.0, 800.0], help="route length range (m)")
     ap.add_argument("--out", default="runs/eval.json")
     a = ap.parse_args(argv)
     from .policy import load_policy
@@ -77,7 +80,8 @@ def main(argv=None) -> None:
         cfg.map.seed = map_seed
         assets = AssetLibrary("auto")
         world = build_world(cfg, assets=assets)
-        env = DrivingEnv(cfg, world, assets=assets, seed=map_seed)
+        env = DrivingEnv(cfg, world, assets=assets, seed=map_seed, route_m=tuple(a.route),
+                         max_seconds=a.max_steps * 0.1)  # fmt: skip
         for ep in range(a.episodes):
             seed = 900_000 + map_seed * 100 + ep
             for name, drv in drivers.items():

@@ -14,28 +14,17 @@ command, expert controls and gear, and per-step metadata.
 from __future__ import annotations
 
 import argparse
-import io
 import json
 import os
 import time
 
 import numpy as np
-from PIL import Image
 
 from ..assets import AssetLibrary
 from ..config import SimConfig
 from ..world import build_world
 from .env import DrivingEnv
-
-
-def encode(img: np.ndarray, quality: int = 88) -> bytes:
-    buf = io.BytesIO()
-    Image.fromarray(img).save(buf, format="JPEG", quality=quality)
-    return buf.getvalue()
-
-
-def decode(b: bytes) -> np.ndarray:
-    return np.asarray(Image.open(io.BytesIO(b)).convert("RGB"))
+from .jpeg import decode, encode  # noqa: F401  (re-exported)
 
 
 def record_episode(env: DrivingEnv, seed: int, noise: float, policy=None, max_steps: int = 2400) -> dict:
@@ -43,6 +32,8 @@ def record_episode(env: DrivingEnv, seed: int, noise: float, policy=None, max_st
     env.expert.noise = noise
     env.expert.rng = rng
     obs, info = env.reset(seed=seed)
+    if policy is not None and hasattr(policy, "reset"):
+        policy.reset()
     frames, states, commands, controls, gears, meta = [], [], [], [], [], []
     reason = None
     for _ in range(max_steps):

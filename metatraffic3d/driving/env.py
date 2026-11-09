@@ -141,10 +141,19 @@ class DrivingEnv:
         x, y, h = self.tracker.pose_on_lane(lane_id, s)
         mujoco.mj_resetData(self.model, self.data)
         self.city.sync(sim, incidents=self.incidents)
-        z = float(self.world.terrain.height(x, y)) + self.world.net.lane_z(lane_id, max(s - 2.3, 0.0))
-        self.car.place(x, y, z, h, speed=0.0)
+        H = self.world.terrain
+        lz = self.world.net.lane_z(lane_id, max(s - 2.3, 0.0))
+        c, sn = math.cos(h), math.sin(h)
+        zf = float(H.height(x + 1.4 * c, y + 1.4 * sn))
+        zb = float(H.height(x - 1.4 * c, y - 1.4 * sn))
+        zl = float(H.height(x - 0.8 * sn, y + 0.8 * c))
+        zr = float(H.height(x + 0.8 * sn, y - 0.8 * c))
+        pitch = math.atan2(zb - zf, 2.8) if lz == 0 else 0.0  # on the ground, sit on the slope
+        roll = math.atan2(zl - zr, 1.6) if lz == 0 else 0.0
+        self.car.place(x, y, max(zf, zb, zl, zr) + lz, h, speed=0.0, pitch=pitch, roll=roll)
         mujoco.mj_forward(self.model, self.data)
-        for _ in range(100):  # settle the suspension
+        self.car.act(0.0, 0.0, 1.0, "1")
+        for _ in range(250):  # settle onto the ground with the brakes on
             self.car.apply(0.002)
             mujoco.mj_step(self.model, self.data)
         self.expert.reset()

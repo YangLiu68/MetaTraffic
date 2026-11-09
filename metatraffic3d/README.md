@@ -101,11 +101,28 @@ speed from the simulator's own car-following advice (which already accounts for 
 signs, pedestrians, closures and the car ahead), with an automatic gear schedule. It produces
 exactly the policy's action format.
 
+**DriveFormer** (`transformer.py`), the policy, is a time-aware multi-camera transformer in the
+spirit of Waymo's Wayformer-style token fusion:
+
+```
+4 cameras x last 4 frames (0.2 s apart)  -> frozen ImageNet ResNet-18 -> 3x5 grid -> 15 tokens each
++ a car-state token per frame (speed, rpm, gear, steering, slope)
++ a route-command token
++ learned query tokens (action, future-action chunk, value)
+every token: + camera, image-position, token-type embedding
+image/state tokens: + Fourier embedding of their age in seconds   <- time awareness
+-> 4-layer pre-norm transformer encoder (d=256, 8 heads), 3.35 M trainable parameters
+-> action now: steer (tanh), throttle, brake (sigmoid), gear logits (R N 1-5)
+-> next 1 s of controls (auxiliary, trajectory-like target), value (for RL)
+```
+
+The earlier model (pooled features per camera, concatenated, one branch per route command;
+`policy.py`) is kept as a baseline and trains from the same feature cache.
+
 Pipeline: `collect` (expert drives with DART action noise; the label is the clean action) ->
-`train-bc` (frozen ImageNet ResNet-18 features per camera, fused with state and command,
-conditional-imitation branches per route command) -> optional DAgger rounds (`collect --driver
-policy`) -> `rl` (PPO on the env reward with a behaviour-cloning term) -> `evaluate`
-(closed-loop on held-out cities and routes).
+`train-bc --arch transformer` (frame features cached once on disk) -> optional DAgger rounds
+(`collect --driver policy`) -> `rl` (PPO on the env reward with a behaviour-cloning term,
+time-limit cut-offs bootstrapped) -> `evaluate` (closed-loop on held-out cities and routes).
 
 _Results: data collection and training are in progress; numbers will be added here once measured._
 
@@ -118,7 +135,21 @@ next street. Taxis pick up and drop off in free kerb spots (or double-park with 
 One option-scoring network serves both decisions; training is MAPPO with parameter sharing,
 a centralised critic, semi-MDP returns and a behaviour-cloning warm start.
 
-_Results on the final simulator are in progress._
+Results on the final simulator (map seed 4, 5 taxis, 120 background cars, 150 pedestrians,
+30-minute episodes, 20 held-out demand seeds; `python -m metatraffic3d eval-taxi`):
+
+| Policy | Deliveries / taxi-hour | Abandoned pickups / episode | Earned / episode |
+|---|---|---|---|
+| random | 0 | 28.0 | 0 |
+| greedy (nearest passenger, live ETAs) | 4.54 | 6.9 | 19.6 |
+| greedy (free-flow ETAs) | 4.64 | 7.1 | 19.7 |
+| greedy-feasible (skips unreachable passengers) | 4.70 | 4.9 | 20.1 |
+| **MAPPO** (BC warm start + 40 PPO iterations) | **4.72** | **2.9** | 19.6 |
+
+Paired over the same 20 seeds against the strongest heuristic (greedy-feasible), MAPPO
+abandons 2.0 +/- 0.6 fewer pickups per episode, while deliveries (+0.02 +/- 0.13 per taxi-hour)
+and earnings (-0.5 +/- 0.5) do not differ. The fleet learned to stop claiming passengers it
+cannot reach in time; it did not learn to serve more of them.
 
 ## Backends
 

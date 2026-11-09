@@ -121,10 +121,16 @@ class EgoCar:
         self.brake = 0.0
         self.steer_angle = 0.0
 
-    def place(self, x: float, y: float, z: float, yaw: float, speed: float = 0.0) -> None:
+    def place(self, x: float, y: float, z: float, yaw: float, speed: float = 0.0, pitch: float = 0.0,
+              roll: float = 0.0) -> None:  # fmt: skip
+        """Put the car at a pose; ``pitch``/``roll`` should match the ground slope (pitch + = nose down)."""
         q = self.root_qpos
-        self.d.qpos[q:q + 3] = (x, y, z + 0.05)
-        self.d.qpos[q + 3:q + 7] = (math.cos(yaw / 2), 0, 0, math.sin(yaw / 2))
+        self.d.qpos[q:q + 3] = (x, y, z + 0.12)
+        cy, sy = math.cos(yaw / 2), math.sin(yaw / 2)
+        cp, sp = math.cos(pitch / 2), math.sin(pitch / 2)
+        cr, sr = math.cos(roll / 2), math.sin(roll / 2)
+        self.d.qpos[q + 3:q + 7] = (cr * cp * cy + sr * sp * sy, sr * cp * cy - cr * sp * sy,
+                                    cr * sp * cy + sr * cp * sy, cr * cp * sy - sr * sp * cy)  # fmt: skip
         dof = self.root_dof
         self.d.qvel[dof:dof + 6] = 0.0
         self.d.qvel[dof] = speed * math.cos(yaw)

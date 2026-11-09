@@ -111,6 +111,9 @@ class PolicyRunner:
         self.head = head.to(encoder.dev).eval()
         self.enc = encoder
 
+    def reset(self) -> None:
+        pass
+
     def __call__(self, obs: dict) -> dict:
         torch, _ = _torch()
         dev = self.enc.dev
@@ -123,9 +126,16 @@ class PolicyRunner:
         return {"control": m.astype(np.float32), "gear": int(gear_logits[0].argmax().item())}
 
 
-def load_policy(path: str) -> PolicyRunner:
+def load_policy(path: str):
+    """A callable driver from a checkpoint (DriveFormer or the MLP baseline)."""
     torch, _ = _torch()
     ck = torch.load(path, map_location="cpu", weights_only=False)
+    if ck.get("arch") == "transformer":
+        from .transformer import SpatialEncoder, TransformerRunner, make_driveformer
+
+        model = make_driveformer(ck["n_cams"])
+        model.load_state_dict(ck["model"])
+        return TransformerRunner(model, SpatialEncoder())
     head = make_head(ck["n_cams"])
-    head.load_state_dict(ck["head"])
+    head.load_state_dict(ck.get("model") or ck["head"])
     return PolicyRunner(head, Encoder(pretrained=ck.get("pretrained", True)))

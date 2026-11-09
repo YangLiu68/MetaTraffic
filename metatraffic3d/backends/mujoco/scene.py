@@ -206,10 +206,7 @@ def build_mjcf(world: World, out_dir: str, assets: AssetLibrary | None = None,
     if slots.ego:
         vis = "".join(f'<geom type="mesh" mesh="{mn}" {"material=" + chr(34) + "palette" + chr(34) if tex else "rgba=" + chr(34) + _rgba(c if not tint else (0.92, 0.93, 0.95, 1)) + chr(34)} '
                       f'contype="0" conaffinity="0" mass="0" group="{G_VEHICLES}"/>' for mn, c, tint, tex in parts_of("sedan"))  # fmt: skip
-        lights = ('<light name="ego_head_l" mode="track" pos="2.3 0.6 0.8" dir="1 0 -0.12" directional="false" cutoff="35" '
-                  'exponent="8" diffuse="0.9 0.88 0.8" attenuation="1 0.02 0.0005" active="false"/>'
-                  '<light name="ego_head_r" mode="track" pos="2.3 -0.6 0.8" dir="1 0 -0.12" directional="false" cutoff="35" '
-                  'exponent="8" diffuse="0.9 0.88 0.8" attenuation="1 0.02 0.0005" active="false"/>')  # fmt: skip
+        lights = ""  # no spot lights: in MuJoCo's renderer an active spot light darkens the rest of the scene
         body_xml.append(ego_xml("ego", vis, slots.ego_cameras, lights))
         actuators = f"<actuator>{ego_actuators('ego')}</actuator>"
 

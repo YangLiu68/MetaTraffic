@@ -26,6 +26,9 @@ HIDDEN = np.array([0.0, 0.0, -60.0])
 G_OFF = 4  # geom group that is never drawn (pooled bodies not in use)
 
 
+# No headlight spot lights: in MuJoCo's renderer an active spot light leaves the rest of the
+# scene unlit (found 2026-11-08, also with castshadow off). Night is a dim, street-lit city:
+# low sun and ambient light, glowing traffic lamps, a dark sky.
 @dataclass(frozen=True)
 class Weather:
     name: str
@@ -40,10 +43,10 @@ class Weather:
 WEATHERS = {
     "clear": Weather("clear", (0.75, 0.73, 0.68), (0.42, 0.42, 0.45), None, (15, 60), 1.0, False),
     "overcast": Weather("overcast", (0.40, 0.41, 0.43), (0.50, 0.50, 0.52), (0.70, 0.72, 0.75), (6, 30), 1.0, False),
-    "dusk": Weather("dusk", (0.75, 0.45, 0.25), (0.25, 0.22, 0.25), (0.55, 0.42, 0.40), (6, 30), 1.0, True),
-    "night": Weather("night", (0.05, 0.05, 0.08), (0.10, 0.10, 0.14), (0.04, 0.05, 0.08), (2, 12), 0.95, True),
-    "rain": Weather("rain", (0.30, 0.31, 0.33), (0.36, 0.37, 0.40), (0.55, 0.57, 0.60), (1.5, 10), 0.65, True),
-    "fog": Weather("fog", (0.35, 0.35, 0.36), (0.55, 0.55, 0.56), (0.78, 0.79, 0.80), (0.2, 2.2), 0.85, True),
+    "dusk": Weather("dusk", (0.75, 0.45, 0.25), (0.25, 0.22, 0.25), (0.55, 0.42, 0.40), (6, 30), 1.0, False),
+    "night": Weather("night", (0.10, 0.10, 0.15), (0.20, 0.20, 0.26), (0.04, 0.05, 0.08), (2, 12), 0.95, False),
+    "rain": Weather("rain", (0.30, 0.31, 0.33), (0.36, 0.37, 0.40), (0.55, 0.57, 0.60), (1.5, 10), 0.65, False),
+    "fog": Weather("fog", (0.35, 0.35, 0.36), (0.55, 0.55, 0.56), (0.78, 0.79, 0.80), (0.2, 2.2), 0.85, False),
 }
 
 
@@ -112,7 +115,7 @@ class MujocoCity:
             top = m.hfield_size[0, 2]
             m.hfield_data[:] = (np.clip(hgt, 0, None) / top).ravel()
         self.sun = m.light("sun").id
-        self.head = [m.light(n).id for n in ("ego_head_l", "ego_head_r")] if self.slots.ego else []
+        self.head = []  # headlight spot lights removed (see WEATHERS note)
         self._slot_of: dict[int, int] = {}
         self._free: dict[str, list[int]] = {t: list(ids) for t, ids in self.pools.items()}
         self._last_parked_key = None
