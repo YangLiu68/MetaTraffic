@@ -19,6 +19,7 @@ from __future__ import annotations
 import argparse
 import glob
 import json
+import math
 import os
 import time
 
@@ -171,14 +172,15 @@ def main(argv=None) -> None:
             torch.mps.empty_cache()  # give back the memory the backbone used for feature extraction
     if init is not None:
         pca = PCA(init["pca_mean"], init["pca_comp"])
-        pca.explained = float("nan")
+        pca.explained = float(init.get("pca_explained", float("nan")))
     else:
         pca = PCA.fit(tr.sample_tokens(800, rng), a.pca)
     tr.compress(pca)
     va.compress(pca)
     print(f"features ready in {time.time() - t0:.0f}s: {len(tr.items)} train / {len(va.items)} val steps "
-          f"({len(tr_files)}/{len(val_files)} episodes) on {dev}; PCA {FEAT}->{a.pca} keeps "
-          f"{pca.explained:.1%} of the variance; peak memory {peak_memory_gb():.2f} GB", flush=True)  # fmt: skip
+          f"({len(tr_files)}/{len(val_files)} episodes) on {dev}; PCA {FEAT}->{a.pca} "
+          f"{'from --init' if math.isnan(pca.explained) else f'keeps {pca.explained:.1%} of the variance'}; "
+          f"peak memory {peak_memory_gb():.2f} GB", flush=True)  # fmt: skip
     n_cams = tr.eps[0]["feat"].shape[1]
     model = (make_driveformer(n_cams, feat_dim=a.pca) if a.arch == "transformer"
              else make_head(n_cams, feat_dim=a.pca)).to(dev)  # fmt: skip
@@ -259,8 +261,8 @@ def main(argv=None) -> None:
         # save the best weights so far after every epoch, so an interrupted run still leaves a policy
         tmp = os.path.join(a.out, "policy.pt.tmp")
         torch.save({"arch": a.arch, "model": best[1], "n_cams": n_cams, "pretrained": True, "log": log,
-                    "feat_dim": a.pca, "pca_mean": pca.mean, "pca_comp": pca.comp, "epochs_done": epoch + 1,
-                    "init": a.init,
+                    "feat_dim": a.pca, "pca_mean": pca.mean, "pca_comp": pca.comp, "pca_explained": pca.explained,
+                    "epochs_done": epoch + 1, "init": a.init,
                     "params": n_params, "train_files": tr_files, "val_files": val_files}, tmp)  # fmt: skip
         os.replace(tmp, os.path.join(a.out, "policy.pt"))
     print(f"saved {a.out}/policy.pt ({a.arch}, {n_params / 1e6:.2f} M params, best val {best[0]:.4f})")
