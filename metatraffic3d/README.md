@@ -81,8 +81,11 @@ discretionary lane changes, kerb parking with pull-in/pull-out, congestion-aware
   vehicles on a siren run (others change lanes or pull aside; priority at junctions), signal
   outages (junction becomes an all-way stop), hard braking, red-light runners, aggressive cut-ins,
   delivery double-parking.
-* **Weather and time of day**: clear, overcast, dusk, night (headlights), rain (road friction 0.65),
-  fog; drivers keep longer gaps and slow down in bad conditions.
+* **Weather and time of day**: clear, overcast, dusk, night (a dim, street-lit city; car
+  headlights are off because MuJoCo's spot lights darken the rest of the scene), rain (road
+  friction 0.65), fog; drivers keep longer gaps and slow down in bad conditions.
+
+![one street through the main camera in all six weathers](../docs/images/weather.jpg)
 
 ## Self-driving: camera-only, end-to-end (`driving/`)
 
