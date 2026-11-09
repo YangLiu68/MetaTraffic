@@ -114,7 +114,7 @@ spirit of Waymo's Wayformer-style token fusion:
 + learned query tokens (action, future-action chunk, value)
 every token: + camera, image-position, token-type embedding
 image/state tokens: + Fourier embedding of their age in seconds   <- time awareness
--> 4-layer pre-norm transformer encoder (d=256, 8 heads), 3.35 M trainable parameters
+-> 4-layer pre-norm transformer encoder (d=256, 8 heads), 3.24 M trainable parameters
 -> action now: steer (tanh), throttle, brake (sigmoid), gear logits (R N 1-5)
 -> next 1 s of controls (auxiliary, trajectory-like target), value (for RL)
 ```
@@ -127,7 +127,40 @@ Pipeline: `collect` (expert drives with DART action noise; the label is the clea
 (`collect --driver policy`) -> `rl` (PPO on the env reward with a behaviour-cloning term,
 time-limit cut-offs bootstrapped) -> `evaluate` (closed-loop on held-out cities and routes).
 
-_Results: data collection and training are in progress; numbers will be added here once measured._
+Backbone features are cached once and compressed 512 -> 64 per token with PCA, so a training
+run fits in about 4 GB on a 16 GB Mac (Apple MPS, gradient checkpointing per layer).
+
+Against the usual failure modes of cloning a driver from histories:
+
+* **dead outputs**: throttle and brake are trained with cross-entropy on their logits (an L1 loss
+  on a sigmoid that is almost always 0 had pushed the brake into the flat end, where it never
+  moved again);
+* **copycat**: steps where the expert changes what it is doing (gear changes, braking while
+  moving, pulling away) count 5-10x, and half the samples hide their past states (past motion
+  dropout, from Waymo's ChauffeurNet);
+* **compounding errors**: DAgger rounds where the policy drives and the expert takes over for
+  random stretches (30% of the time); every step is labelled with the expert's action;
+* **averaged decisions**: at run time only the larger pedal is used, as the expert never presses
+  both; otherwise "wait" and "go" average into a half-pressed throttle held by a half-pressed
+  brake.
+
+Closed loop on two unseen cities (maps 6 and 2, 5 routes of 300-800 m each, 150 s limit;
+`evaluate --seeds 6 2 --episodes 5`):
+
+| Driver | Route completion | Collisions / km | Ends stuck | Speed |
+|---|---|---|---|---|
+| expert (privileged) | 0.70 | 0 | 0 / 10 | 14 km/h |
+| DriveFormer, expert demos only | 0.07 | 3.4 | 0 / 10 | 26 km/h |
+| + fixes above, DAgger round 1 | 0.08 | 0 | 5 / 10 | 5 km/h |
+| + DAgger round 2, motion dropout | 0.11 | 2.4 | 5 / 10 | 6 km/h |
+| + one-pedal rule | 0.12 | 3.6 | 3 / 10 | 9 km/h |
+
+The cloned policies are not good drivers yet. Open loop they match the expert closely (steering
+error 0.02-0.03 on held-out expert episodes), but in closed loop they fail within a few hundred
+metres. They do about as badly on new routes in their training cities (completion 0.13, stuck
+4 of 6), so the gap is closed-loop robustness rather than new-city generalisation. The expert
+itself runs into the 150 s limit on 8 of its 10 routes, hence 0.70. More DAgger rounds over more
+cities and the RL stage are the next steps.
 
 ## Multi-agent taxi fleet (`marl/`)
 
