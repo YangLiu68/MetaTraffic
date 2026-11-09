@@ -176,11 +176,13 @@ def chunk_loss(chunk, target, mask):
 class TransformerRunner:
     """Callable policy for the env with its own frame history (call ``reset()`` per episode)."""
 
-    def __init__(self, model, encoder: SpatialEncoder, pca: PCA | None = None, jpeg: bool = True) -> None:
+    def __init__(self, model, encoder: SpatialEncoder, pca: PCA | None = None, jpeg: bool = True,
+                 one_pedal: bool = True) -> None:  # fmt: skip
         self.model = model.to(encoder.dev).eval()
         self.enc = encoder
         self.pca = pca
         self.jpeg = jpeg  # training frames were JPEG-compressed; match that at run time
+        self.one_pedal = one_pedal  # keep only the larger pedal (policy.pick_one_pedal)
         self.reset()
 
     def reset(self) -> None:
@@ -207,4 +209,7 @@ class TransformerRunner:
         if len(self.frames) > keep:  # only the history window is needed
             drop = len(self.frames) - keep
             self.frames, self.states = self.frames[drop:], self.states[drop:]
-        return {"control": mean[0].cpu().numpy().astype(np.float32), "gear": int(gl[0].argmax().item())}
+        from .policy import pick_one_pedal
+
+        ctl = mean[0].cpu().numpy().astype(np.float32)
+        return {"control": pick_one_pedal(ctl) if self.one_pedal else ctl, "gear": int(gl[0].argmax().item())}

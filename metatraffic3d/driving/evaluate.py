@@ -70,10 +70,11 @@ def main(argv=None) -> None:
     ap.add_argument("--max-steps", type=int, default=1500)
     ap.add_argument("--route", type=float, nargs=2, default=[300.0, 800.0], help="route length range (m)")
     ap.add_argument("--out", default="runs/eval.json")
+    ap.add_argument("--two-pedals", action="store_true", help="use raw throttle and brake (no one-pedal rule)")
     a = ap.parse_args(argv)
     from .policy import load_policy
 
-    drivers = {d: ("expert" if d == "expert" else load_policy(d)) for d in a.drivers}
+    drivers = {d: ("expert" if d == "expert" else load_policy(d, one_pedal=not a.two_pedals)) for d in a.drivers}
     results: dict[str, list] = {d: [] for d in drivers}
     for map_seed in a.seeds:
         cfg = SimConfig()

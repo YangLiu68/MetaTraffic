@@ -87,3 +87,12 @@ def test_pedal_loss_recovers_from_a_saturated_brake():
     logits.grad = None
     bc_loss(mean, gear_logits, target, gear, pedal_logits=logits)[0].backward()
     assert float(logits.grad[0, 1]) < -0.5  # cross-entropy on the logit: full-strength push to brake
+
+
+def test_one_pedal_rule_turns_half_pressed_pedals_into_a_decision():
+    from metatraffic3d.driving.policy import pick_one_pedal
+
+    assert pick_one_pedal(np.array([0.1, 0.09, 0.07])).tolist() == pytest.approx([0.1, 0.09, 0.0])
+    assert pick_one_pedal(np.array([0.0, 0.06, 0.15])).tolist() == pytest.approx([0.0, 0.0, 0.15])
+    raw = np.array([0.0, 0.3, 0.0], np.float32)
+    assert pick_one_pedal(raw) is not raw  # the network output is not changed in place
