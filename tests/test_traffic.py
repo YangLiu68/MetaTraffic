@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from metatraffic3d.traffic.demand import demand_weights
 from metatraffic3d.traffic.events import IncidentManager
@@ -62,3 +63,27 @@ def test_construction_closes_and_reopens_a_lane(small_world):
         assert span in sim.static_blocks[lane]
     inc._finish(z)
     assert all(span not in sim.static_blocks.get(lane, []) for lane, span in z.lanes)
+
+
+
+def test_construction_never_picks_a_lane_too_short_for_the_zone(small_world, monkeypatch):
+    # lanes are trimmed at junctions, so an edge long enough for a work zone can still have a
+    # short lane (this crashed DAgger collection on map 4 with "high - low < 0"); force that case
+    from metatraffic3d.roads import Lane
+
+    sim = _sim(small_world, seed=5)
+    net = sim.net
+    arterial = [de for de in net.dedges.values() if len(de.drive) >= 2 and de.length >= 90]
+    if not arterial:
+        pytest.skip("no arterial long enough in the small test city")
+    short = {lid for de in arterial for lid in de.drive}
+    full = Lane.length.fget
+    monkeypatch.setattr(Lane, "length", property(lambda ln: min(full(ln), 70.0) if ln.id in short else full(ln)))
+    for seed in range(60):
+        inc = IncidentManager(sim, seed=seed, rates={}, initial_construction=0)
+        z = inc._start("construction")
+        if z is None:
+            continue
+        for lane, (a, b) in z.lanes:
+            assert lane not in short and b <= net.lanes[lane].length
+        inc._finish(z)

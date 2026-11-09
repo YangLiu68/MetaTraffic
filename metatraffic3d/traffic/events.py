@@ -151,6 +151,8 @@ class IncidentManager:
             if len(de.drive) >= 2:  # arterial: close the kerb or median lane with a taper
                 k = 0 if rng.random() < 0.6 else len(de.drive) - 1
                 lane = net.lanes[de.drive[k]]
+                if lane.length < 90:  # lanes are trimmed at junctions, so can be shorter than the edge
+                    continue
                 length = float(rng.uniform(35, min(110, lane.length - 50)))
                 s0 = float(rng.uniform(35, lane.length - length - 10))
                 if not self._lane_free(lane.id, s0 - 30, s0 + length):
@@ -164,6 +166,8 @@ class IncidentManager:
                 return inc
             if de.park is not None and rng.random() < 0.7:  # sub-road: cone off part of the kerb lane
                 lane = net.lanes[de.park]
+                if lane.length < 30:
+                    continue
                 length = float(rng.uniform(20, min(60, lane.length - 10)))
                 s0 = float(rng.uniform(5, max(lane.length - length - 5, 5.1)))
                 spots = [sid for sid in lane.spots if s0 - 3 < net.spots[sid].s < s0 + length + 3 and sim.spot_state[sid] == FREE]
