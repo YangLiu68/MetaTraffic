@@ -75,13 +75,13 @@ class SpatialEncoder:
 
 
 def make_driveformer(n_cams: int = 4, d: int = 256, layers: int = 4, heads: int = 8, state_dim: int = 12,
-                     cmd_dim: int = 7, n_gears: int = 7):  # fmt: skip
+                     cmd_dim: int = 7, n_gears: int = 7, feat_dim: int = FEAT):  # fmt: skip
     torch, nn = _torch()
 
     class DriveFormer(nn.Module):
         def __init__(self) -> None:
             super().__init__()
-            self.img_proj = nn.Sequential(nn.LayerNorm(FEAT), nn.Linear(FEAT, d))
+            self.img_proj = nn.Sequential(nn.LayerNorm(feat_dim), nn.Linear(feat_dim, d))
             self.cam_emb = nn.Embedding(n_cams, d)
             self.pos_emb = nn.Embedding(N_TOK, d)
             self.type_emb = nn.Embedding(5, d)  # image, state, command, action/chunk query, value query
@@ -104,7 +104,7 @@ def make_driveformer(n_cams: int = 4, d: int = 256, layers: int = 4, heads: int 
             return self.time_proj(torch.cat([a.sin(), a.cos()], dim=-1))
 
         def forward(self, img, ages, states, command):
-            """img (B, T, N, 15, 512); ages (B, T) s; states (B, T, 12); command (B, 7)."""
+            """img (B, T, N, 15, feat_dim); ages (B, T) s; states (B, T, 12); command (B, 7)."""
             b, t, n, k, _ = img.shape
             dev = img.device
             tok = self.img_proj(img)
@@ -116,7 +116,16 @@ def make_driveformer(n_cams: int = 4, d: int = 256, layers: int = 4, heads: int 
             cm = (self.cmd_proj(command) + self.type_emb.weight[2])[:, None]
             q = self.queries[None].expand(b, -1, -1) + self.type_emb.weight[[3, 3, 4]][None]
             x = torch.cat([tok.reshape(b, t * n * k, -1), st, cm, q], dim=1)
-            h = self.norm(self.encoder(x))
+            if self.training and torch.is_grad_enabled():
+                # gradient checkpointing: keep only each layer's input and recompute its attention
+                # maps in the backward pass (the maps are ~250 tokens squared per head and sample)
+                from torch.utils.checkpoint import checkpoint
+
+                for layer in self.encoder.layers:
+                    x = checkpoint(layer, x, use_reentrant=False)
+            else:
+                x = self.encoder(x)
+            h = self.norm(x)
             qa, qc, qv = h[:, -3], h[:, -2], h[:, -1]
             out = self.act_head(qa)
             raw = out[:, :3]
@@ -128,6 +137,35 @@ def make_driveformer(n_cams: int = 4, d: int = 256, layers: int = 4, heads: int 
     return DriveFormer()
 
 
+class PCA:
+    """Fixed linear compression of backbone features (fitted on training data, stored in checkpoints)."""
+
+    def __init__(self, mean: np.ndarray, comp: np.ndarray) -> None:
+        self.mean = np.asarray(mean, np.float32)
+        self.comp = np.asarray(comp, np.float32)  # (k, 512)
+
+    @classmethod
+    def fit(cls, x: np.ndarray, k: int) -> PCA:
+        """Top-``k`` principal directions of rows ``x`` (n, 512), via the 512 x 512 covariance."""
+        x = np.asarray(x, np.float64)
+        mean = x.mean(0)
+        xc = x - mean
+        evals, evecs = np.linalg.eigh(xc.T @ xc)  # ascending
+        evals, evecs = evals[::-1].clip(min=0.0), evecs[:, ::-1]
+        pca = cls(mean, evecs[:, :k].T)
+        pca.explained = float(evals[:k].sum() / max(evals.sum(), 1e-12))
+        return pca
+
+    def __call__(self, x):
+        """numpy or torch array (..., 512) -> (..., k)."""
+        if isinstance(x, np.ndarray):
+            return (x.astype(np.float32) - self.mean) @ self.comp.T
+        torch, _ = _torch()
+        m = torch.as_tensor(self.mean, device=x.device)
+        c = torch.as_tensor(self.comp, device=x.device)
+        return (x.float() - m) @ c.T
+
+
 def chunk_loss(chunk, target, mask):
     """L1 over the future controls that exist (mask (B, H) = 1 inside the episode)."""
     err = (chunk - target).abs().sum(-1)
@@ -137,9 +175,10 @@ def chunk_loss(chunk, target, mask):
 class TransformerRunner:
     """Callable policy for the env with its own frame history (call ``reset()`` per episode)."""
 
-    def __init__(self, model, encoder: SpatialEncoder) -> None:
+    def __init__(self, model, encoder: SpatialEncoder, pca: PCA | None = None) -> None:
         self.model = model.to(encoder.dev).eval()
         self.enc = encoder
+        self.pca = pca
         self.reset()
 
     def reset(self) -> None:
@@ -149,7 +188,8 @@ class TransformerRunner:
     def __call__(self, obs: dict) -> dict:
         torch, _ = _torch()
         dev = self.enc.dev
-        self.frames.append(self.enc(obs["images"][None])[0])  # (N, 15, 512)
+        f = self.enc(obs["images"][None])[0]  # (N, 15, 512)
+        self.frames.append(self.pca(f) if self.pca is not None else f)
         self.states.append(torch.as_tensor(obs["state"], device=dev))
         t = len(self.frames) - 1
         idx, ages = history_index(t)

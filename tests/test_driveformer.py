@@ -37,3 +37,39 @@ def test_time_matters():
     a = m(img, torch.tensor([[0.6, 0.4, 0.2, 0.0]]), states, cmd)[0]
     b = m(img, torch.tensor([[0.0, 0.0, 0.0, 0.0]]), states, cmd)[0]
     assert not torch.allclose(a, b)  # the same frames at different ages give different outputs
+
+
+def test_pca_keeps_the_dominant_directions_and_matches_torch():
+    from metatraffic3d.driving.transformer import PCA
+
+    rng = np.random.default_rng(0)
+    basis = np.linalg.qr(rng.normal(size=(512, 8)))[0].T  # 8 orthonormal directions
+    x = rng.normal(size=(2000, 8)) * np.arange(8, 0, -1) @ basis + 0.01 * rng.normal(size=(2000, 512)) + 3.0
+    pca = PCA.fit(x, 8)
+    assert pca.comp.shape == (8, 512) and pca.explained > 0.99
+    z = pca(x[:5].astype(np.float32))
+    back = z @ pca.comp + pca.mean
+    assert np.abs(back - x[:5]).max() < 0.1  # 8 components reconstruct the data
+    zt = pca(torch.as_tensor(x[:5], dtype=torch.float16))
+    assert np.allclose(zt.numpy(), z, atol=0.05)
+    m = make_driveformer(n_cams=2, feat_dim=8)  # the model takes the compressed width
+    out = m(torch.randn(1, HIST, 2, 15, 8), torch.zeros(1, HIST), torch.zeros(1, HIST, 12), torch.zeros(1, 7))
+    assert out[0].shape == (1, 3)
+
+
+def test_checkpointed_training_pass_matches_plain_pass():
+    torch.manual_seed(0)
+    m = make_driveformer(n_cams=2, feat_dim=16).train()
+    for mod in m.modules():  # no dropout, so both paths are deterministic
+        if isinstance(mod, torch.nn.Dropout):
+            mod.p = 0.0
+        if isinstance(mod, torch.nn.MultiheadAttention):
+            mod.dropout = 0.0
+    args = (torch.randn(2, HIST, 2, 15, 16), torch.rand(2, HIST), torch.randn(2, HIST, 12), torch.zeros(2, 7))
+    out = m(*args)  # training + grad: checkpointed layers
+    with torch.no_grad():
+        ref = m(*args)  # plain encoder
+    for a, b in zip(out, ref):
+        assert torch.allclose(a, b, atol=1e-5)
+    out[0].sum().backward()
+    assert m.encoder.layers[0].linear1.weight.grad is not None

@@ -24,7 +24,7 @@ from ..config import SimConfig
 from ..world import build_world
 from .env import DrivingEnv
 from .policy import bc_loss, device
-from .transformer import HIST, STRIDE, SpatialEncoder, history_index, make_driveformer
+from .transformer import HIST, PCA, STRIDE, SpatialEncoder, history_index, make_driveformer
 
 
 class History:
@@ -65,9 +65,10 @@ def main(argv=None) -> None:
     dev = device()
     ck = torch.load(a.init, map_location="cpu", weights_only=False)
     assert ck.get("arch") == "transformer", "RL fine-tuning expects a DriveFormer checkpoint"
-    model = make_driveformer(ck["n_cams"]).to(dev)
+    model = make_driveformer(ck["n_cams"], feat_dim=ck.get("feat_dim", 512)).to(dev)
     model.load_state_dict(ck["model"])
     enc = SpatialEncoder(dev)
+    pca = PCA(ck["pca_mean"], ck["pca_comp"]) if "pca_comp" in ck else None
     opt = torch.optim.Adam(model.parameters(), lr=a.lr)
     rng = np.random.default_rng(0)
     envs = []
@@ -85,7 +86,8 @@ def main(argv=None) -> None:
     total = 0
 
     def encode(o):
-        return enc(o["images"][None])[0].half().cpu()
+        f = enc(o["images"][None])[0]
+        return (pca(f) if pca is not None else f).half().cpu()
 
     cur = hist.push(encode(obs), obs["state"])
     while total < a.steps:
@@ -190,7 +192,8 @@ def main(argv=None) -> None:
         log.append(row)
         print(json.dumps(row), flush=True)
         torch.save({"arch": "transformer", "model": {k: v.detach().cpu() for k, v in model.state_dict().items()},
-                    "n_cams": ck["n_cams"], "pretrained": True, "log": log, "episodes": episodes},
+                    "n_cams": ck["n_cams"], "pretrained": True, "log": log, "episodes": episodes,
+                    "feat_dim": ck.get("feat_dim", 512), "pca_mean": ck.get("pca_mean"), "pca_comp": ck.get("pca_comp")},
                    os.path.join(a.out, "policy.pt"))  # fmt: skip
 
 

@@ -25,11 +25,37 @@ from .jpeg import decode
 from .transformer import FEAT, HORIZON, N_TOK, history_index
 
 
+def peak_memory_gb() -> float:
+    """Peak physical footprint of this process so far (includes MPS memory on macOS)."""
+    try:
+        import ctypes
+        import ctypes.util
+
+        lib = ctypes.CDLL(ctypes.util.find_library("proc") or "/usr/lib/libproc.dylib")
+        buf = ctypes.create_string_buffer(512)
+        if lib.proc_pid_rusage(os.getpid(), 4, buf) == 0:  # rusage_info_v4.ri_lifetime_max_phys_footprint
+            return int.from_bytes(buf.raw[240:248], "little") / 1e9
+    except OSError:
+        pass
+    import resource
+
+    return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1e9
+
+
+def cache_key(path: str, cache_dir: str) -> str:
+    folder = os.path.basename(os.path.dirname(os.path.abspath(path)))
+    return os.path.join(cache_dir, f"{folder}__" + os.path.basename(path).replace(".npz", ".tok.npy"))
+
+
+def cache_fresh(path: str, cache_dir: str) -> bool:
+    key = cache_key(path, cache_dir)
+    return os.path.exists(key) and os.path.getmtime(key) >= os.path.getmtime(path)
+
+
 def cache_features(path: str, enc, cache_dir: str, batch: int = 64) -> np.ndarray:
     """(T, N, 15, 512) float16 memmap of an episode's spatial features (computed once)."""
-    folder = os.path.basename(os.path.dirname(os.path.abspath(path)))
-    key = os.path.join(cache_dir, f"{folder}__" + os.path.basename(path).replace(".npz", ".tok.npy"))
-    if not os.path.exists(key) or os.path.getmtime(key) < os.path.getmtime(path):
+    key = cache_key(path, cache_dir)
+    if not cache_fresh(path, cache_dir):
         z = np.load(path)
         jpeg, off, n = z["jpeg"].tobytes(), z["offsets"], int(z["n_cams"])
         frames = [decode(jpeg[off[i]:off[i + 1]]) for i in range(len(off) - 1)]
@@ -50,10 +76,23 @@ class Demos:
         self.eps = []
         for f in files:
             z = np.load(f)
-            self.eps.append({"feat": cache_features(f, enc, cache_dir), "state": z["state"].astype(np.float32),
+            self.eps.append({"raw": cache_features(f, enc, cache_dir), "state": z["state"].astype(np.float32),
                              "command": z["command"].astype(np.float32), "control": z["control"].astype(np.float32),
                              "gear": z["gear"].astype(np.int64)})  # fmt: skip
         self.items = np.array([(e, t) for e, ep in enumerate(self.eps) for t in range(len(ep["state"]))])
+
+    def sample_tokens(self, n: int, rng) -> np.ndarray:
+        rows = self.items[rng.choice(len(self.items), size=min(n, len(self.items)), replace=False)]
+        return np.concatenate([np.asarray(self.eps[e]["raw"][t], np.float32).reshape(-1, FEAT) for e, t in rows])
+
+    def compress(self, pca) -> None:
+        """Project every cached feature with ``pca`` and keep the result in RAM (float16)."""
+        for ep in self.eps:
+            raw = ep.pop("raw")
+            out = np.empty(raw.shape[:3] + (pca.comp.shape[0],), np.float16)
+            for i in range(0, len(raw), 256):
+                out[i:i + 256] = pca(np.asarray(raw[i:i + 256])).astype(np.float16)
+            ep["feat"] = out
 
     def batch(self, items: np.ndarray, arch: str) -> dict:
         out: dict[str, list] = {k: [] for k in ("img", "ages", "states", "cmd", "ctl", "gear", "chunk", "mask")}
@@ -89,17 +128,20 @@ def main(argv=None) -> None:
     ap.add_argument("--val", type=float, default=0.15)
     ap.add_argument("--chunk-weight", type=float, default=0.5)
     ap.add_argument("--max-steps-per-epoch", type=int, default=0)
+    ap.add_argument("--pca", type=int, default=64, help="compress backbone features to this many dims")
+    ap.add_argument("--device", choices=["auto", "cpu", "mps", "cuda"], default="auto")
     a = ap.parse_args(argv)
     import torch
 
     from .policy import bc_loss, device, make_head
-    from .transformer import SpatialEncoder, chunk_loss, make_driveformer
+    from .transformer import PCA, SpatialEncoder, chunk_loss, make_driveformer
 
     os.makedirs(a.out, exist_ok=True)
     os.makedirs(a.cache, exist_ok=True)
-    dev = device()
-    enc = SpatialEncoder(dev)
+    dev = device() if a.device == "auto" else torch.device(a.device)
     files = sorted(f for d in a.data for f in glob.glob(os.path.join(d, "*.npz")))
+    # the backbone is only needed for episodes whose features are not cached yet
+    enc = None if all(cache_fresh(f, a.cache) for f in files) else SpatialEncoder(device())
     rng = np.random.default_rng(0)
     order = rng.permutation(len(files))
     n_val = max(1, int(round(len(files) * a.val)))
@@ -107,11 +149,19 @@ def main(argv=None) -> None:
     tr_files = [f for f in files if f not in val_files]
     t0 = time.time()
     tr, va = Demos(tr_files, enc, a.cache), Demos(val_files, enc, a.cache)
-    del enc
+    if enc is not None:
+        del enc
+        if torch.backends.mps.is_available():
+            torch.mps.empty_cache()  # give back the memory the backbone used for feature extraction
+    pca = PCA.fit(tr.sample_tokens(800, rng), a.pca)
+    tr.compress(pca)
+    va.compress(pca)
     print(f"features ready in {time.time() - t0:.0f}s: {len(tr.items)} train / {len(va.items)} val steps "
-          f"({len(tr_files)}/{len(val_files)} episodes) on {dev}", flush=True)  # fmt: skip
+          f"({len(tr_files)}/{len(val_files)} episodes) on {dev}; PCA {FEAT}->{a.pca} keeps "
+          f"{pca.explained:.1%} of the variance; peak memory {peak_memory_gb():.2f} GB", flush=True)  # fmt: skip
     n_cams = tr.eps[0]["feat"].shape[1]
-    model = (make_driveformer(n_cams) if a.arch == "transformer" else make_head(n_cams)).to(dev)
+    model = (make_driveformer(n_cams, feat_dim=a.pca) if a.arch == "transformer"
+             else make_head(n_cams, feat_dim=a.pca)).to(dev)  # fmt: skip
     n_params = sum(p.numel() for p in model.parameters())
     opt = torch.optim.AdamW(model.parameters(), lr=a.lr, weight_decay=1e-2 if a.arch == "transformer" else 1e-4)
     steps_per_epoch = len(tr.items) // a.batch
@@ -131,6 +181,7 @@ def main(argv=None) -> None:
         mean, gl, _ = model(img, tt["states"], tt["cmd"])
         return bc_loss(mean, gl, tt["ctl"], tt["gear"])
 
+    vidx = np.sort(np.random.default_rng(1).permutation(len(va.items))[:6000])  # fixed spread-out val subset
     log, best = [], (1e9, None)
     for epoch in range(a.epochs):
         model.train()
@@ -147,19 +198,23 @@ def main(argv=None) -> None:
         model.eval()
         vl, vm, nb = 0.0, {}, 0
         with torch.no_grad():
-            for i in range(0, min(len(va.items), 6000), 256):
-                loss, m = run(va.batch(va.items[i:i + 256], a.arch), False)
+            for i in range(0, len(vidx), a.batch):
+                loss, m = run(va.batch(va.items[vidx[i:i + a.batch]], a.arch), False)
                 vl += float(loss)
                 for k, v in m.items():
                     vm[k] = vm.get(k, 0.0) + v
                 nb += 1
         row = {"epoch": epoch, "train_loss": tot / max(steps_per_epoch, 1), "val_loss": vl / nb,
-               **{k: v / nb for k, v in vm.items()}, "wall_s": round(time.time() - t0)}  # fmt: skip
+               **{k: v / nb for k, v in vm.items()}, "wall_s": round(time.time() - t0),
+               "peak_gb": round(peak_memory_gb(), 2)}  # fmt: skip
+        if dev.type == "mps":
+            torch.mps.empty_cache()
         log.append(row)
         print(json.dumps({k: round(v, 4) if isinstance(v, float) else v for k, v in row.items()}), flush=True)
         if row["val_loss"] < best[0]:
             best = (row["val_loss"], {k: v.detach().cpu() for k, v in model.state_dict().items()})
     torch.save({"arch": a.arch, "model": best[1], "n_cams": n_cams, "pretrained": True, "log": log,
+                "feat_dim": a.pca, "pca_mean": pca.mean, "pca_comp": pca.comp,
                 "params": n_params, "train_files": tr_files, "val_files": val_files},
                os.path.join(a.out, "policy.pt"))  # fmt: skip
     print(f"saved {a.out}/policy.pt ({a.arch}, {n_params / 1e6:.2f} M params, best val {best[0]:.4f})")

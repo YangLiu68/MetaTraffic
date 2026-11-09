@@ -65,14 +65,14 @@ class Encoder:
         return f.view(b, n, -1)
 
 
-def make_head(n_cams: int, state_dim: int = 12, cmd_dim: int = N_COMMANDS + 1):
+def make_head(n_cams: int, state_dim: int = 12, cmd_dim: int = N_COMMANDS + 1, feat_dim: int = FEAT):
     torch, nn = _torch()
 
     class Head(nn.Module):
         def __init__(self):
             super().__init__()
-            self.cam = nn.Parameter(torch.zeros(n_cams, FEAT))
-            self.proj = nn.Sequential(nn.Linear(FEAT, 128), nn.ReLU())
+            self.cam = nn.Parameter(torch.zeros(n_cams, feat_dim))
+            self.proj = nn.Sequential(nn.Linear(feat_dim, 128), nn.ReLU())
             self.trunk = nn.Sequential(nn.Linear(n_cams * 128 + state_dim + cmd_dim, 512), nn.ReLU(),
                                        nn.Linear(512, 256), nn.ReLU())  # fmt: skip
             self.branches = nn.Linear(256, N_COMMANDS * (3 + N_GEARS))
@@ -107,9 +107,10 @@ def bc_loss(mean, gear_logits, control, gear):
 class PolicyRunner:
     """Callable policy for the env: obs -> action dict (deterministic means, argmax gear)."""
 
-    def __init__(self, head, encoder: Encoder) -> None:
+    def __init__(self, head, encoder: Encoder, pca=None) -> None:
         self.head = head.to(encoder.dev).eval()
         self.enc = encoder
+        self.pca = pca
 
     def reset(self) -> None:
         pass
@@ -118,6 +119,8 @@ class PolicyRunner:
         torch, _ = _torch()
         dev = self.enc.dev
         feats = self.enc(obs["images"][None])
+        if self.pca is not None:
+            feats = self.pca(feats)
         st = torch.as_tensor(obs["state"][None], device=dev)
         cm = torch.as_tensor(obs["command"][None], device=dev)
         with torch.no_grad():
@@ -130,12 +133,14 @@ def load_policy(path: str):
     """A callable driver from a checkpoint (DriveFormer or the MLP baseline)."""
     torch, _ = _torch()
     ck = torch.load(path, map_location="cpu", weights_only=False)
-    if ck.get("arch") == "transformer":
-        from .transformer import SpatialEncoder, TransformerRunner, make_driveformer
+    from .transformer import PCA, SpatialEncoder, TransformerRunner, make_driveformer
 
-        model = make_driveformer(ck["n_cams"])
+    pca = PCA(ck["pca_mean"], ck["pca_comp"]) if "pca_comp" in ck else None
+    feat_dim = ck.get("feat_dim", FEAT)
+    if ck.get("arch") == "transformer":
+        model = make_driveformer(ck["n_cams"], feat_dim=feat_dim)
         model.load_state_dict(ck["model"])
-        return TransformerRunner(model, SpatialEncoder())
-    head = make_head(ck["n_cams"])
+        return TransformerRunner(model, SpatialEncoder(), pca)
+    head = make_head(ck["n_cams"], feat_dim=feat_dim)
     head.load_state_dict(ck.get("model") or ck["head"])
-    return PolicyRunner(head, Encoder(pretrained=ck.get("pretrained", True)))
+    return PolicyRunner(head, Encoder(pretrained=ck.get("pretrained", True)), pca)
