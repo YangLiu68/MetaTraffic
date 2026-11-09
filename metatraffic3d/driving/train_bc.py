@@ -5,7 +5,10 @@
 1. Every camera frame goes once through the frozen ImageNet ResNet-18; its 3 x 5 grid of
    512-d features is cached on disk (float16, memory-mapped, one file per episode).
 2. ``--arch transformer`` trains DriveFormer (``transformer.py``) on 4-frame histories with
-   their real time gaps, predicting the action now plus the next second of controls.
+   their real time gaps, predicting the action now plus the next second of controls. Against
+   the copycat problem of cloning from histories: rare decisions (gear changes, braking,
+   pulling away) are up-weighted and half the samples hide their past states (past motion
+   dropout, as in Waymo's ChauffeurNet).
    ``--arch mlp`` trains the earlier concatenate-and-branch model (``policy.py``) on the same
    cache (spatially pooled features of the current frame) as a baseline.
 Validation is split by episode.
@@ -132,6 +135,8 @@ def main(argv=None) -> None:
     ap.add_argument("--device", choices=["auto", "cpu", "mps", "cuda"], default="auto")
     ap.add_argument("--init", default=None, help="warm start from this checkpoint (keeps its PCA and val episodes)")
     ap.add_argument("--no-keyframes", action="store_true", help="do not up-weight gear changes / braking")
+    ap.add_argument("--motion-dropout", type=float, default=0.5,
+                    help="share of training samples whose past states are hidden (ChauffeurNet's past motion dropout)")
     a = ap.parse_args(argv)
     import torch
 
@@ -193,7 +198,13 @@ def main(argv=None) -> None:
         now = tt["states"][:, -1] if a.arch == "transformer" else tt["states"]
         w_ctl, w_gear = (None, None) if a.no_keyframes else keyframe_weights(now, tt["ctl"], tt["gear"])
         if a.arch == "transformer":
-            mean, gl, chunk, _ = model(img, tt["ages"], tt["states"], tt["cmd"])
+            states = tt["states"]
+            if train and a.motion_dropout > 0:
+                # past motion dropout (Waymo's ChauffeurNet): for some samples the older state tokens just
+                # repeat the current one, so the policy cannot simply continue its own past speed / gear
+                hide = torch.rand(states.shape[0], device=dev) < a.motion_dropout
+                states = torch.where(hide[:, None, None], states[:, -1:].expand_as(states), states)
+            mean, gl, chunk, _ = model(img, tt["ages"], states, tt["cmd"])
         else:
             mean, gl, _ = model(img, tt["states"], tt["cmd"])
         loss, m = bc_loss(mean, gl, tt["ctl"], tt["gear"], w_ctl, w_gear, pedal_logits=model.last_pedal_logits)
