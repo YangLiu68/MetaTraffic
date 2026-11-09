@@ -1,0 +1,880 @@
+[
+ {
+  "role": "sedan",
+  "id": "Cz6yDaUcM9",
+  "title": "Car",
+  "creator": "Quaternius",
+  "licence": "CC0 1.0",
+  "glb": "https://static.poly.pizza/59a67a6c-490e-472e-bae6-5a4d2541f1c7.glb",
+  "yaw_deg": 90,
+  "target": {
+   "length": 4.5
+  },
+  "tintable": true,
+  "native_size": [
+   4.221,
+   1.807,
+   1.177
+  ],
+  "tris": 2952,
+  "notes": "Quaternius Cars Bundle; blue body paint is the tintable Part."
+ },
+ {
+  "role": "suv",
+  "id": "xsMtZhBkxL",
+  "title": "SUV",
+  "creator": "Quaternius",
+  "licence": "CC0 1.0",
+  "glb": "https://static.poly.pizza/e5fbf2ee-5c9e-47d5-8ab6-80cacd463baa.glb",
+  "yaw_deg": 90,
+  "target": {
+   "length": 4.8
+  },
+  "tintable": true,
+  "native_size": [
+   4.209,
+   2.111,
+   1.528
+  ],
+  "tris": 3294,
+  "notes": "Quaternius Cars Bundle; silver body paint is the tintable Part (light-colour fallback)."
+ },
+ {
+  "role": "hatchback",
+  "id": "unqqkULtRU",
+  "title": "Car",
+  "creator": "Quaternius",
+  "licence": "CC0 1.0",
+  "glb": "https://static.poly.pizza/d35173c8-6078-4367-8f87-b1f2599f0bb7.glb",
+  "yaw_deg": 90,
+  "target": {
+   "length": 4.0
+  },
+  "tintable": true,
+  "native_size": [
+   3.31,
+   1.638,
+   1.146
+  ],
+  "tris": 3124,
+  "notes": "Quaternius Cars Bundle compact car (short-tail sedan rather than a true hatchback); silver paint tintable."
+ },
+ {
+  "role": "van",
+  "id": "BbRojf2v3H",
+  "title": "Generic Van",
+  "creator": "PuKkBuMXDD",
+  "licence": "CC-BY 3.0",
+  "glb": "https://static.poly.pizza/233b6797-9ce6-4369-8458-0b7fe16444ef.glb",
+  "yaw_deg": 180,
+  "target": {
+   "length": 5.0
+  },
+  "tintable": true,
+  "native_size": [
+   5.682,
+   3.185,
+   3.18
+  ],
+  "tris": 3225,
+  "notes": "High-roof panel van, front was at -x. Native mirrors make it ~2.8 m wide at 5 m length."
+ },
+ {
+  "role": "taxi",
+  "id": "x43lOScTpN",
+  "title": "Taxi",
+  "creator": "Quaternius",
+  "licence": "CC0 1.0",
+  "glb": "https://static.poly.pizza/3622a7bf-f213-44c8-8949-c1bdd1e961a9.glb",
+  "yaw_deg": 90,
+  "target": {
+   "length": 4.6
+  },
+  "native_size": [
+   4.221,
+   1.807,
+   1.31
+  ],
+  "tris": 3269,
+  "notes": "Quaternius Cars Bundle; yellow with roof TAXI sign."
+ },
+ {
+  "role": "police",
+  "id": "BwwnUrWGmV",
+  "title": "Police Car",
+  "creator": "Quaternius",
+  "licence": "CC0 1.0",
+  "glb": "https://static.poly.pizza/179e43ce-b9e0-40cf-8b99-641693d3207e.glb",
+  "yaw_deg": 90,
+  "target": {
+   "length": 4.8
+  },
+  "light_bar": {
+   "z_min": 1.45
+  },
+  "native_size": [
+   3.73,
+   1.778,
+   1.239
+  ],
+  "tris": 3232,
+  "notes": "Quaternius Cars Bundle; black/white. Light bar = the red and the blue roof lamp Parts (last two Parts, tagged 'light_bar'); the white bar body stays a normal Part."
+ },
+ {
+  "role": "ambulance",
+  "id": "a27WN4TXbwk",
+  "title": "Ambulance",
+  "creator": "jeremy",
+  "licence": "CC-BY 3.0",
+  "glb": "https://static.poly.pizza/3d97878f-a9c6-423c-aeed-2b1ce94d7eaa.glb",
+  "yaw_deg": -90,
+  "target": {
+   "length": 5.5
+  },
+  "light_bar": {
+   "z_min": 2.8
+  },
+  "native_size": [
+   16.465,
+   7.842,
+   9.803
+  ],
+  "tris": 2750,
+  "notes": "Van-type ambulance (front was at +y), red cross on the sides. Light bar = the red roof lamps (front bar over the cab and two rear corners), split into the last Part(s), tagged 'light_bar' by part_tags(). A bit tall: 3.27 m at 5.5 m length."
+ },
+ {
+  "role": "bus",
+  "id": "4CPpvEmrMoF",
+  "title": "Bus",
+  "creator": "Poly by Google",
+  "licence": "CC-BY 3.0",
+  "glb": "https://static.poly.pizza/635a02b7-4260-42a5-bd52-987511d6e3e0.glb",
+  "yaw_deg": 90,
+  "target": {
+   "length": 12.0
+  },
+  "native_size": [
+   157.461,
+   50.061,
+   48.807
+  ],
+  "tris": 2226,
+  "notes": "Coach-style city bus; mirrors make the bbox ~3.8 m wide (body ~2.6 m)."
+ },
+ {
+  "role": "truck",
+  "id": "jHwRymyg2C",
+  "title": "Truckk",
+  "creator": "KolosStudios",
+  "licence": "CC-BY 3.0",
+  "glb": "https://static.poly.pizza/3e7fbbbd-6b3e-43d9-b9bd-cb62bf8d9388.glb",
+  "yaw_deg": 180,
+  "target": {
+   "length": 7.5
+  },
+  "native_size": [
+   10.848,
+   4.418,
+   4.375
+  ],
+  "tris": 696,
+  "notes": "Olive canvas-covered cargo truck (looks a bit military); front was at -x."
+ },
+ {
+  "role": "delivery",
+  "id": "cXw6oiFtZ8",
+  "title": "Truck",
+  "creator": "Quaternius",
+  "licence": "CC0 1.0",
+  "glb": "https://static.poly.pizza/f4b28921-b45e-4653-b54c-c3976e4ea0fe.glb",
+  "yaw_deg": 90,
+  "target": {
+   "length": 6.0
+  },
+  "native_size": [
+   5.256,
+   2.709,
+   2.884
+  ],
+  "tris": 7474,
+  "notes": "Quaternius box truck (post-apocalypse pack, not damaged); olive with stripes."
+ },
+ {
+  "role": "fire_truck",
+  "id": "P4XkeNmBLj",
+  "title": "Fire Engine",
+  "creator": "J-Toastie",
+  "licence": "CC-BY 3.0",
+  "glb": "https://static.poly.pizza/ed1198f5-bbf0-47cf-87d3-93a1fb1396b4.glb",
+  "yaw_deg": 90,
+  "target": {
+   "length": 9.0
+  },
+  "light_bar": {
+   "z_min": 2.65
+  },
+  "native_size": [
+   8.406,
+   2.748,
+   3.009
+  ],
+  "tris": 5248,
+  "notes": "Red fire engine with ladder. Light bar = the bright-red lamps on the cab roof (last Part, tagged 'light_bar')."
+ },
+ {
+  "role": "pickup",
+  "id": "qn4grQgHm8",
+  "title": "Pickup Truck",
+  "creator": "Quaternius",
+  "licence": "CC0 1.0",
+  "glb": "https://static.poly.pizza/4e925a01-dbb8-4aab-848b-221306b835ea.glb",
+  "yaw_deg": 90,
+  "target": {
+   "length": 5.3
+  },
+  "native_size": [
+   5.18,
+   2.312,
+   1.848
+  ],
+  "tris": 6432,
+  "notes": "Quaternius pickup truck (blue)."
+ },
+ {
+  "role": "sports",
+  "id": "OyqKvX9xNh",
+  "title": "Sports Car",
+  "creator": "Quaternius",
+  "licence": "CC0 1.0",
+  "glb": "https://static.poly.pizza/e6410e19-a88f-4158-bc91-c19fccf85028.glb",
+  "yaw_deg": 90,
+  "target": {
+   "length": 4.4
+  },
+  "native_size": [
+   3.969,
+   1.805,
+   1.155
+  ],
+  "tris": 3066,
+  "notes": "Quaternius Cars Bundle sports car (orange)."
+ },
+ {
+  "role": "motorcycle",
+  "id": "5_MTCnqfUTr",
+  "title": "Motorcycle",
+  "creator": "Poly by Google",
+  "licence": "CC-BY 3.0",
+  "glb": "https://static.poly.pizza/4fa4f21a-c3b8-425f-8e57-9c202b1d6ba6.glb",
+  "yaw_deg": 0,
+  "target": {
+   "length": 2.1
+  },
+  "native_size": [
+   14.512,
+   6.857,
+   9.445
+  ],
+  "tris": 3294,
+  "notes": "Cruiser motorcycle, no rider."
+ },
+ {
+  "role": "bicycle",
+  "id": "19VoUuA2pcN",
+  "title": "Bicycle",
+  "creator": "Poly by Google",
+  "licence": "CC-BY 3.0",
+  "glb": "https://static.poly.pizza/6048701b-fa87-426b-9242-c786ca25fa3a.glb",
+  "yaw_deg": 0,
+  "target": {
+   "length": 1.8
+  },
+  "native_size": [
+   3.613,
+   1.243,
+   2.111
+  ],
+  "tris": 1714,
+  "notes": "Blue road bicycle, no rider; thin tubes (many small triangles)."
+ },
+ {
+  "role": "person_a",
+  "id": "mQnGoME1ez",
+  "title": "Man in Suit",
+  "creator": "Quaternius",
+  "licence": "CC0 1.0",
+  "glb": "https://static.poly.pizza/66b57880-bcb0-479a-8d72-5c3e88afaa39.glb",
+  "yaw_deg": 90,
+  "target": {
+   "height": 1.75
+  },
+  "pose": "Man_Idle",
+  "native_size": [
+   0.922,
+   1.413,
+   4.806
+  ],
+  "tris": 2055,
+  "notes": "Quaternius Animated Men Pack, posed with the Idle animation at t=0 (bind pose is a T-pose)."
+ },
+ {
+  "role": "person_b",
+  "id": "jpKRgGDxhk",
+  "title": "Woman Casual",
+  "creator": "Quaternius",
+  "licence": "CC0 1.0",
+  "glb": "https://static.poly.pizza/51d5abdd-bb87-4b8d-9967-21738ffb8437.glb",
+  "yaw_deg": 90,
+  "target": {
+   "height": 1.75
+  },
+  "pose": "Female_Idle",
+  "native_size": [
+   0.82,
+   1.399,
+   4.623
+  ],
+  "tris": 2776,
+  "notes": "Quaternius Animated Women Pack, Idle pose."
+ },
+ {
+  "role": "person_c",
+  "id": "fjHyMd5Wxw",
+  "title": "Man",
+  "creator": "Quaternius",
+  "licence": "CC0 1.0",
+  "glb": "https://static.poly.pizza/985eacbf-9dde-44b7-9270-4e35c8400b13.glb",
+  "yaw_deg": 90,
+  "target": {
+   "height": 1.75
+  },
+  "pose": "Man_Walk",
+  "native_size": [
+   1.295,
+   1.688,
+   4.733
+  ],
+  "tris": 1851,
+  "notes": "Quaternius Animated Men Pack, mid-stride Walk pose."
+ },
+ {
+  "role": "person_d",
+  "id": "zMyPlQXBzq",
+  "title": "Woman in Dress",
+  "creator": "Quaternius",
+  "licence": "CC0 1.0",
+  "glb": "https://static.poly.pizza/a642af96-e239-4c5f-b50d-7661ff51deec.glb",
+  "yaw_deg": 90,
+  "target": {
+   "height": 1.75
+  },
+  "pose": "Female_Walk",
+  "native_size": [
+   1.227,
+   1.505,
+   4.564
+  ],
+  "tris": 1786,
+  "notes": "Quaternius Animated Women Pack (red dress), Walk pose."
+ },
+ {
+  "role": "tree_round",
+  "id": "k6cozoNfLH",
+  "title": "Birch Tree",
+  "creator": "Quaternius",
+  "licence": "CC0 1.0",
+  "glb": "https://static.poly.pizza/f51ba6c2-51e9-43ce-b2a9-ccb0230b55e6.glb",
+  "yaw_deg": 0,
+  "target": {
+   "height": 7.0
+  },
+  "native_size": [
+   1.702,
+   2.48,
+   3.574
+  ],
+  "tris": 1704,
+  "notes": "Quaternius Ultimate Nature birch: rounded green crown, white trunk."
+ },
+ {
+  "role": "tree_cone",
+  "id": "gX8WmgkeEm",
+  "title": "Pine Tree",
+  "creator": "Quaternius",
+  "licence": "CC0 1.0",
+  "glb": "https://static.poly.pizza/4ab9f316-03f8-4588-9dcb-ca4f02f4219b.glb",
+  "yaw_deg": 0,
+  "target": {
+   "height": 8.0
+  },
+  "native_size": [
+   1.797,
+   1.958,
+   3.565
+  ],
+  "tris": 1681,
+  "notes": "Quaternius Ultimate Nature pine (tiered cone)."
+ },
+ {
+  "role": "tree_small",
+  "id": "2lRubrT6Na",
+  "title": "Autumn Tree",
+  "creator": "Quaternius",
+  "licence": "CC0 1.0",
+  "glb": "https://static.poly.pizza/653f3101-2c31-4d15-9e54-3d81aeca345a.glb",
+  "yaw_deg": 0,
+  "target": {
+   "height": 4.0
+  },
+  "native_size": [
+   1.663,
+   2.541,
+   3.123
+  ],
+  "tris": 2950,
+  "notes": "Quaternius Ultimate Nature autumn tree (orange crown) for colour variety."
+ },
+ {
+  "role": "bush",
+  "id": "92EytlU1El",
+  "title": "Bush",
+  "creator": "Quaternius",
+  "licence": "CC0 1.0",
+  "glb": "https://static.poly.pizza/57727111-0deb-4a85-9182-9f1371f6ca96.glb",
+  "yaw_deg": 0,
+  "target": {
+   "height": 1.2
+  },
+  "native_size": [
+   1.328,
+   1.69,
+   1.242
+  ],
+  "tris": 364,
+  "notes": "Quaternius Ultimate Nature bush."
+ },
+ {
+  "role": "traffic_light",
+  "id": "apWcPbwhlq",
+  "title": "Traffic Light",
+  "creator": "Quaternius",
+  "licence": "CC0 1.0",
+  "glb": "https://static.poly.pizza/25b4c51b-bcab-476e-9152-94d5049b27ee.glb",
+  "yaw_deg": 90,
+  "target": {
+   "height": 5.5
+  },
+  "origin": "base",
+  "tags": {
+   "housing": [
+    0.79,
+    0.65,
+    0.03
+   ],
+   "lamp_red": [
+    0.71,
+    0.02,
+    0.09
+   ],
+   "lamp_yellow": [
+    0.71,
+    0.67,
+    0.02
+   ],
+   "lamp_green": [
+    0.37,
+    0.71,
+    0.0
+   ]
+  },
+  "native_size": [
+   1.511,
+   1.513,
+   4.664
+  ],
+  "tris": 846,
+  "notes": "Pole with one 3-lamp signal head (lamps face +x, centres at about z 5.1/4.75/4.4 m) and two green street-name signs; origin at the pole base. Housing = the yellow Part (tag 'housing'); each lamp is its own Part (tags 'lamp_red', 'lamp_yellow', 'lamp_green')."
+ },
+ {
+  "role": "stop_sign",
+  "id": "60GyU9CdZ9r",
+  "title": "Stop sign",
+  "creator": "Poly by Google",
+  "licence": "CC-BY 3.0",
+  "glb": "https://static.poly.pizza/e86cad98-cb40-49cb-b9d0-31c9314f0116.glb",
+  "yaw_deg": 0,
+  "target": {
+   "height": 2.4
+  },
+  "origin": "base",
+  "native_size": [
+   8.007,
+   75.228,
+   230.863
+  ],
+  "tris": 236,
+  "notes": "Octagon with modelled STOP letters, face points +x; origin at the post."
+ },
+ {
+  "role": "streetlight",
+  "id": "0lxF8Dl1jU",
+  "title": "Street Light",
+  "creator": "Quaternius",
+  "licence": "CC0 1.0",
+  "glb": "https://static.poly.pizza/451a3b57-b957-4184-9c67-4a11587299b5.glb",
+  "yaw_deg": 90,
+  "target": {
+   "height": 7.0
+  },
+  "origin": "base",
+  "native_size": [
+   2.925,
+   0.364,
+   6.643
+  ],
+  "tris": 426,
+  "notes": "Curved-arm street light, lamp head overhangs toward +x; origin at the pole base."
+ },
+ {
+  "role": "bench",
+  "id": "kn0sMwbspb",
+  "title": "Park Bench",
+  "creator": "J-Toastie",
+  "licence": "CC-BY 3.0",
+  "glb": "https://static.poly.pizza/2fe64f02-e002-45c6-8852-ddc1645a6245.glb",
+  "yaw_deg": 0,
+  "target": {
+   "height": 0.9
+  },
+  "native_size": [
+   1.843,
+   3.129,
+   2.133
+  ],
+  "tris": 498,
+  "notes": "Wood-slat park bench, seat faces +x, long axis y (~1.3 m long at 0.9 m height)."
+ },
+ {
+  "role": "bus_stop",
+  "id": "OWczicNWhO",
+  "title": "Bus Stop",
+  "creator": "Zsky",
+  "licence": "CC-BY 3.0",
+  "glb": "https://static.poly.pizza/7a1ec2af-89e6-4785-976f-7c0991608a88.glb",
+  "yaw_deg": 90,
+  "target": {
+   "height": 2.8
+  },
+  "native_size": [
+   24.765,
+   38.306,
+   27.199
+  ],
+  "tris": 456,
+  "notes": "Blue glass shelter, open side faces +x, long axis y."
+ },
+ {
+  "role": "traffic_cone",
+  "id": "aDIrUbMbW3",
+  "title": "Traffic Cone",
+  "creator": "Quaternius",
+  "licence": "CC0 1.0",
+  "glb": "https://static.poly.pizza/846de5e8-b6bf-4f84-ba21-54187a473c74.glb",
+  "yaw_deg": 0,
+  "target": {
+   "height": 0.7
+  },
+  "native_size": [
+   0.522,
+   0.522,
+   0.673
+  ],
+  "tris": 134,
+  "notes": "Quaternius orange cone with white bands on a square base."
+ },
+ {
+  "role": "barrier",
+  "id": "cM3aJPU9NS",
+  "title": "Traffic Barrier",
+  "creator": "Quaternius",
+  "licence": "CC0 1.0",
+  "glb": "https://static.poly.pizza/bb0861ab-63dd-4f72-8697-f75b8a2e3d93.glb",
+  "yaw_deg": 90,
+  "target": {
+   "height": 1.0
+  },
+  "native_size": [
+   0.78,
+   1.555,
+   0.802
+  ],
+  "tris": 364,
+  "notes": "Quaternius A-frame road-works barricade, striped boards face +x, long axis y."
+ },
+ {
+  "role": "fire_hydrant",
+  "id": "DKkMQbEklp",
+  "title": "Fire Hydrant",
+  "creator": "Quaternius",
+  "licence": "CC0 1.0",
+  "glb": "https://static.poly.pizza/0e892859-5ccd-4f9a-aa56-c7a9adb6f3de.glb",
+  "yaw_deg": 0,
+  "target": {
+   "height": 0.8
+  },
+  "native_size": [
+   0.515,
+   0.399,
+   0.772
+  ],
+  "tris": 976,
+  "notes": "Quaternius red hydrant."
+ },
+ {
+  "role": "trash_can",
+  "id": "eYNKnGlhon",
+  "title": "Trashcan Large",
+  "creator": "Quaternius",
+  "licence": "CC0 1.0",
+  "glb": "https://static.poly.pizza/ed8a9b54-8d2c-4e2b-a78f-9c2646d4ea63.glb",
+  "yaw_deg": 0,
+  "target": {
+   "height": 1.0
+  },
+  "native_size": [
+   1.223,
+   1.223,
+   1.846
+  ],
+  "tris": 646,
+  "notes": "Quaternius lidded metal garbage can (dark grey)."
+ },
+ {
+  "role": "excavator",
+  "id": "eY1N7Rz9Drr",
+  "title": "Bulldozer",
+  "creator": "Poly by Google",
+  "licence": "CC-BY 3.0",
+  "glb": "https://static.poly.pizza/4e401f2d-1000-472e-8167-0e3279b2d86d.glb",
+  "yaw_deg": 90,
+  "target": {
+   "height": 3.5
+  },
+  "native_size": [
+   17.678,
+   12.853,
+   11.523
+  ],
+  "tris": 2518,
+  "notes": "No excavator on Poly Pizza; this is a yellow bulldozer, blade at +x (about 5.4 m long at 3.5 m height)."
+ },
+ {
+  "role": "jersey_barrier",
+  "id": "wCUxgt2jSP",
+  "title": "Barrier Single",
+  "creator": "Quaternius",
+  "licence": "CC0 1.0",
+  "glb": "https://static.poly.pizza/8b30a401-db60-4168-8eaf-43f097bb5470.glb",
+  "yaw_deg": 90,
+  "target": {
+   "height": 0.8
+  },
+  "native_size": [
+   0.657,
+   1.89,
+   0.628
+  ],
+  "tris": 232,
+  "notes": "Quaternius concrete barrier with black/yellow hazard stripes, long axis y (~2.4 m)."
+ },
+ {
+  "role": "road_work_sign",
+  "id": "4MSsNFk5fc",
+  "title": "Sign",
+  "creator": "Quaternius",
+  "licence": "CC0 1.0",
+  "glb": "https://static.poly.pizza/c8fdcd5a-875a-4196-841c-df2cd6ebdc52.glb",
+  "yaw_deg": 90,
+  "target": {
+   "height": 1.5
+  },
+  "native_size": [
+   0.522,
+   0.57,
+   1.032
+  ],
+  "tris": 284,
+  "notes": "Weak match: blank yellow A-frame sandwich board (no 'men at work' pictogram); board faces +x."
+ },
+ {
+  "role": "house_a",
+  "id": "sGgL4Nt7I7",
+  "title": "Two story house",
+  "creator": "Kenney",
+  "licence": "CC0 1.0",
+  "glb": "https://static.poly.pizza/b2dea819-c4b8-4304-9453-1f1d243f0817.glb",
+  "yaw_deg": 90,
+  "target": {
+   "height": 9.12
+  },
+  "native_size": [
+   1.006,
+   1.3,
+   1.137
+  ],
+  "tris": 606,
+  "notes": "Kenney Suburban Houses: 2-floor brick house, door faces +x; Kenney kit scale x8 (about 3.2 m per floor)."
+ },
+ {
+  "role": "house_b",
+  "id": "9N6ROCbmO1",
+  "title": "Two story house",
+  "creator": "Kenney",
+  "licence": "CC0 1.0",
+  "glb": "https://static.poly.pizza/ba439ba2-e8e8-4c44-b546-d3e06ea2c793.glb",
+  "yaw_deg": 90,
+  "target": {
+   "height": 9.12
+  },
+  "native_size": [
+   0.916,
+   1.708,
+   1.137
+  ],
+  "tris": 559,
+  "notes": "Kenney Suburban Houses: 2-floor house with 1-floor wing and roof windows, door faces +x; Kenney kit scale x8 (about 3.2 m per floor)."
+ },
+ {
+  "role": "house_c",
+  "id": "md92wqkDqS",
+  "title": "Two story house",
+  "creator": "Kenney",
+  "licence": "CC0 1.0",
+  "glb": "https://static.poly.pizza/df9a3342-a048-4ba7-8d35-e308209b7172.glb",
+  "yaw_deg": 90,
+  "target": {
+   "height": 9.12
+  },
+  "native_size": [
+   1.316,
+   1.3,
+   1.137
+  ],
+  "tris": 760,
+  "notes": "Kenney Suburban Houses: 2-floor house with porch roof and dormer, door faces +x; Kenney kit scale x8 (about 3.2 m per floor)."
+ },
+ {
+  "role": "shop_a",
+  "id": "EL3ePInr1N",
+  "title": "Building",
+  "creator": "Kay Lousberg",
+  "licence": "CC0 1.0",
+  "glb": "https://static.poly.pizza/58e9d8f4-9d66-4c48-87a7-ac361cebf14b.glb",
+  "yaw_deg": 90,
+  "target": {
+   "height": 9.08
+  },
+  "native_size": [
+   2.0,
+   2.0,
+   1.65
+  ],
+  "tris": 828,
+  "notes": "KayKit 2-floor shop with awning, shop front faces +x. Sits on its own 2x2-tile sidewalk slab with a hydrant/bin (footprint = slab); KayKit City Builder scale x5.5."
+ },
+ {
+  "role": "shop_b",
+  "id": "qOhhGLftam",
+  "title": "Building",
+  "creator": "Kay Lousberg",
+  "licence": "CC0 1.0",
+  "glb": "https://static.poly.pizza/878d8f0d-cf0b-41ef-a6ab-94bd1aeb23dd.glb",
+  "yaw_deg": 90,
+  "target": {
+   "height": 12.93
+  },
+  "native_size": [
+   2.0,
+   2.007,
+   2.35
+  ],
+  "tris": 1356,
+  "notes": "KayKit 3-floor brick building with ground-floor shop and red/white awning, front +x; includes sidewalk slab; KayKit City Builder scale x5.5."
+ },
+ {
+  "role": "office_a",
+  "id": "BwEXdOoUSO",
+  "title": "Skyscraper",
+  "creator": "Kenney",
+  "licence": "CC0 1.0",
+  "glb": "https://static.poly.pizza/b1ec1982-9e4c-4a00-a36e-7506b5fa4eae.glb",
+  "yaw_deg": 90,
+  "target": {
+   "height": 44.0
+  },
+  "native_size": [
+   1.368,
+   1.24,
+   5.5
+  ],
+  "tris": 915,
+  "notes": "Kenney City Kit glass skyscraper (~44 m), entrance faces +x; Kenney kit scale x8 (about 3.2 m per floor)."
+ },
+ {
+  "role": "office_b",
+  "id": "obYD8hWLTZ",
+  "title": "Skyscraper",
+  "creator": "Kenney",
+  "licence": "CC0 1.0",
+  "glb": "https://static.poly.pizza/71ba3a39-2aab-44e8-92f2-99bf5d0ba4f7.glb",
+  "yaw_deg": 90,
+  "target": {
+   "height": 25.2
+  },
+  "native_size": [
+   1.24,
+   1.24,
+   3.15
+  ],
+  "tris": 1416,
+  "notes": "Kenney City Kit classic office tower with green pyramid roof (~25 m); Kenney kit scale x8 (about 3.2 m per floor)."
+ },
+ {
+  "role": "warehouse",
+  "id": "fCiJW5Qdgbf",
+  "title": "Factory",
+  "creator": "Poly by Google",
+  "licence": "CC-BY 3.0",
+  "glb": "https://static.poly.pizza/48e89e99-ce9a-4d63-b8b4-bea8e042626e.glb",
+  "yaw_deg": 90,
+  "target": {
+   "footprint": 28.0
+  },
+  "native_size": [
+   1.386,
+   1.816,
+   1.687
+  ],
+  "tris": 535,
+  "notes": "Dark sawtooth-roof factory hall with two chimneys and a yellow gantry; gable front faces +x."
+ },
+ {
+  "role": "apartment",
+  "id": "g15lpKh4li",
+  "title": "Building",
+  "creator": "Kay Lousberg",
+  "licence": "CC0 1.0",
+  "glb": "https://static.poly.pizza/7aedef6a-3c55-44fa-b805-d3c1f8db401d.glb",
+  "yaw_deg": 90,
+  "target": {
+   "height": 16.39
+  },
+  "native_size": [
+   2.0,
+   2.0,
+   2.977
+  ],
+  "tris": 1020,
+  "notes": "KayKit 4-floor red-brick walk-up with rooftop water tank, front +x; includes sidewalk slab; KayKit City Builder scale x5.5."
+ }
+]

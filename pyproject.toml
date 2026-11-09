@@ -1,0 +1,41 @@
+[project]
+name = "metatraffic"
+version = "0.2.0"
+description = "Procedural 3D cities for self-driving and multi-agent traffic RL (MuJoCo and Isaac Sim backends)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "LGPL-3.0-or-later" }
+dependencies = ["numpy>=1.24", "shapely>=2.1", "pillow>=10.0"]
+
+[project.optional-dependencies]
+mujoco = ["mujoco>=3.2"]
+learn = ["torch>=2.2", "torchvision>=0.17", "gymnasium>=0.29"]
+isaac = ["usd-core>=24.0"]
+assets = ["trimesh>=4.0"]
+dev = ["pytest>=8", "ruff>=0.5"]
+all = ["metatraffic[mujoco,learn,isaac,assets,dev]"]
+
+[project.scripts]
+metatraffic3d = "metatraffic3d.__main__:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["mapgen*", "metatraffic3d*"]
+
+[tool.setuptools.package-data]
+"metatraffic3d.assets" = ["polypizza_manifest.json"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = ["E731", "B905", "E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "mapgen/tests"]
+markers = ["slow: needs MuJoCo rendering or takes > 20 s"]

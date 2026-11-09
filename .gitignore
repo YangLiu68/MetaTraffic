@@ -1,3 +1,7 @@
 __pycache__/
 *.pyc
 .DS_Store
+runs/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/

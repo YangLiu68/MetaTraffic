@@ -9,7 +9,7 @@ from dataclasses import dataclass, field, replace
 from .integrator import RK4Integrator
 from .polygon_finder import PolygonParams, divide_polygons, find_polygons, shrink_polygons
 from .streamlines import StreamlineGenerator, StreamlineParams
-from .tensor_field import NoiseParams, TensorField
+from .tensor_field import NoiseParams, Radial, TensorField
 from .water import NoiseStreamlineParams, WaterGenerator, WaterParams
 
 Vec = tuple[float, float]
@@ -31,6 +31,8 @@ class CityConfig:
     height: float = 678.0
     zoom: float = 0.638
     water: bool = True
+    coast: bool = True  # with water=True: generate the coastline / the river separately
+    river: bool = True
     buildings: bool = True
     num_big_parks: int = 2
     num_small_parks: int = 0
@@ -81,6 +83,7 @@ class CityMap:
     coastline_roads: list[list[Vec]] = field(default_factory=list)
     secondary_river: list[Vec] = field(default_factory=list)
     lots: list[list[Vec]] = field(default_factory=list)
+    radial_centres: list[Vec] = field(default_factory=list)  # centres of radial districts
     timings: dict[str, float] = field(default_factory=dict)
 
 
@@ -129,8 +132,9 @@ def generate_city(config: CityConfig | None = None) -> CityMap:
 
     # 1. Coastline and river
     water = WaterGenerator(integrator, dom_origin, dom_dims, water_p, tf, rng)
-    if cfg.water:
+    if cfg.water and cfg.coast:
         water.create_coast()
+    if cfg.water and cfg.river:
         water.create_river()
     lap("water")
 
@@ -198,6 +202,7 @@ def generate_city(config: CityConfig | None = None) -> CityMap:
         coastline_roads=water.all_streamlines_simple,
         secondary_river=water.river_secondary_road,
         lots=lots,
+        radial_centres=[f.centre for f in tf.basis_fields if isinstance(f, Radial)],
         timings=timings,
     )
 

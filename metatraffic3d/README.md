@@ -1,0 +1,150 @@
+# MetaTraffic 3D
+
+Procedural 3D cities for self-driving and multi-agent traffic research. A seed grows a whole
+city, a traffic simulation fills it with cars, pedestrians and incidents, and two simulator
+backends render it: **MuJoCo** (runs anywhere, fully tested here) and **NVIDIA Isaac Sim**
+(USD export tested; the Isaac runtime script needs an NVIDIA machine and has not been run).
+
+On top of the city there are two learning setups:
+
+* **Camera-only end-to-end driving.** A physical ego car with an engine, gearbox, brakes and
+  steering sees the world through eight Tesla-style cameras and outputs steer, throttle,
+  brake and gear directly. A privileged expert driver provides demonstrations; a policy with
+  an ImageNet-pretrained backbone learns from them, then RL fine-tunes it.
+* **Multi-agent taxi fleet.** Every taxi is an agent that picks passengers and routes through
+  congestion (MAPPO with a centralised critic).
+
+![multi-camera demo](../docs/images/demo_clear.jpg)
+
+## Quick start
+
+```bash
+pip install -e ".[mujoco,learn,assets]"          # numpy, shapely, mujoco, torch, torchvision, trimesh
+python -m metatraffic3d assets fetch              # optional: Poly Pizza models (12 MB); procedural fallbacks otherwise
+python -m metatraffic3d build --seed 4 --png map.png
+python -m metatraffic3d drive-demo --seed 4 --weather clear --seconds 60 --out demo.mp4
+python -m metatraffic3d mjcf --seed 4 --out scenes/seed4 && python -m mujoco.viewer --mjcf scenes/seed4/scene.xml
+python -m metatraffic3d usd --seed 4 --out city.usd   # Isaac Sim (needs usd-core)
+```
+
+Same seed, same city and same episode: `SimConfig().map.seed` fixes the city, `env.reset(seed=...)`
+fixes traffic, pedestrians, passengers, incidents and weather (`tests/test_world.py`,
+`tests/test_envs.py`). Exact replay assumes the same library versions (shapely/GEOS, numpy).
+
+## The city
+
+Everything below is drawn from the seed; nothing is forced. `profile.py` samples the global
+character of each city and any factor can be pinned in `SimConfig().profile`:
+
+| Factor | Values (probability) |
+|---|---|
+| terrain | flat 35%, rolling 30%, hilly 25%, steep 10% (hills fade out near water; grades capped ~25%) |
+| water | coast 60%, river 65%, independently |
+| districts | Dirichlet mix of CBD, commercial, residential, industrial |
+| traffic / pedestrian level | 0.6-1.4x / 0.5-1.5x |
+| elevated highway (experimental) | 30% |
+
+* **Roads** come from the Python port of ProbableTrain/MapGenerator (`mapgen/`), turned into
+  a lane-level network (`roads.py`). Main roads have **8 driving lanes** (4 per direction, a
+  median, right-turn lane, dual left-turn lanes); sub-roads have **4 lanes** (one driving and one
+  kerb parking lane per direction). Kerbs are filled to at most 80%, so there is always somewhere
+  to pull in. Every junction has turn paths with conflict sets; every lane has a way out.
+* **Districts** (`zoning.py`) come from smooth fields: distance to downtown, main-road frontage,
+  waterfront and outskirts, plus seeded noise. They decide building types and junction control.
+* **Buildings** (`heights.py`): detached houses with pitched roofs, apartment blocks, shops with
+  glass ground floors and awnings, offices, towers with podiums (height rising toward
+  downtown), warehouses. Poly Pizza houses and shops replace procedural ones where they fit.
+* **Junction control** (`traffic/control.py`): lights where arterials cross (fixed-time,
+  two phases, yellow and all-red), two-way stops where a side street meets an arterial,
+  all-way stops in residential streets, some lights downtown.
+* **Water and bridges**: sea with a coast strip, a recessed river channel with embankment walls,
+  bridges with decks, railings and piers. **Terrain** (`terrain.py`): seeded hills on a height
+  field that carries the cars in physics.
+* **Elevated highway (experimental)**: when the profile has one, a 2+2-lane 80 km/h viaduct
+  runs above the longest straight arterial, grade-separated, with median ramps at both ends
+  (the arterial's inner lanes are closed under the ramps). Cars use it in routing, it is drawn
+  with deck, barriers and piers, and the ego car can drive on it.
+
+## Traffic, people and incidents (`traffic/`)
+
+Pure-Python microsimulation on the lane network: IDM car-following with vehicle-type and
+weather factors, an intersection manager that grants turn paths (conflicts, no blocking the
+box, main-road priority, starvation protection, lights and stop signs), mandatory and
+discretionary lane changes, kerb parking with pull-in/pull-out, congestion-aware routing.
+
+* **Vehicles**: sedan, SUV, hatchback, pickup, van, taxi, sports car, police car, delivery van,
+  truck, bus, garbage truck, ambulance and fire truck, each with its own size and performance.
+* **Pedestrians** walk the sidewalks, turn corners, cross on zebras (on red at lights, when clear
+  at stops) and sometimes jaywalk; a share of jaywalkers step out without looking.
+* **Incidents** (`events.py`) at seeded rates: construction (lane closed with a cone taper and
+  barriers, kerb lane coned off, or a whole street closed), broken-down cars, crashes, emergency
+  vehicles on a siren run (others change lanes or pull aside; priority at junctions), signal
+  outages (junction becomes an all-way stop), hard braking, red-light runners, aggressive cut-ins,
+  delivery double-parking.
+* **Weather and time of day**: clear, overcast, dusk, night (headlights), rain (road friction 0.65),
+  fog; drivers keep longer gaps and slow down in bad conditions.
+
+## Self-driving: camera-only, end-to-end (`driving/`)
+
+| | |
+|---|---|
+| Ego car | MuJoCo multibody car: 1.3 t chassis, four tyres with contacts, Ackermann steering (rate-limited), rear-wheel drive, engine torque curve (330 N m), 5-speed gearbox + reverse, brakes; slopes and friction from MuJoCo (0-100 km/h 10.7 s, 50-0 km/h in 10.6 m, slows on a 12% hill) |
+| Cameras | 8-camera Tesla-like rig (`cameras.py`): main 50°, wide 120°, narrow 35°, two B-pillar, two repeaters, rear; the policy uses 4 by default (main, both pillars, rear) |
+| Action | `{"control": [steer, throttle, brake], "gear": R/N/1-5}` - direct control, no speed set-points |
+| Observation | camera images + speed, rpm, gear, steering angle, pitch + route command (follow / left / right / straight / U-turn / arrive) |
+| Reward | route progress, comfort, penalties for collisions, red lights, stop signs, wrong way, off-road, speeding |
+| Ends | arrival, collision, 2 s off the road, 60 s stuck, time limit |
+
+The **expert** (`expert.py`) is a privileged rule-based driver, like the CARLA autopilot used by
+LBC, Roach and TransFuser: pure pursuit on the planned lane path, lane changes for turns, and
+speed from the simulator's own car-following advice (which already accounts for lights, stop
+signs, pedestrians, closures and the car ahead), with an automatic gear schedule. It produces
+exactly the policy's action format.
+
+Pipeline: `collect` (expert drives with DART action noise; the label is the clean action) ->
+`train-bc` (frozen ImageNet ResNet-18 features per camera, fused with state and command,
+conditional-imitation branches per route command) -> optional DAgger rounds (`collect --driver
+policy`) -> `rl` (PPO on the env reward with a behaviour-cloning term) -> `evaluate`
+(closed-loop on held-out cities and routes).
+
+_Results: data collection and training are in progress; numbers will be added here once measured._
+
+## Multi-agent taxi fleet (`marl/`)
+
+Each taxi is an agent; passengers appear near tall buildings more often, wait a few minutes
+and leave if nobody comes. Decisions happen only when needed: an idle taxi chooses one of the
+nearest requests or waits; approaching a street with several good ways on, it chooses the
+next street. Taxis pick up and drop off in free kerb spots (or double-park with a penalty).
+One option-scoring network serves both decisions; training is MAPPO with parameter sharing,
+a centralised critic, semi-MDP returns and a behaviour-cloning warm start.
+
+_Results on the final simulator are in progress._
+
+## Backends
+
+* **MuJoCo** (`backends/mujoco/`): one compiled model per city; static geometry is visual only,
+  a plane or height field carries the cars, traffic and people are pooled mocap bodies, unused
+  ones are not drawn, models are merged with a colour-palette texture, traffic-light lamps are
+  lit through materials. About 20 ms per 160x96 camera frame on an M4 (no shadows).
+* **Isaac Sim** (`backends/isaac/`): USD export with instancing, materials, lamps, prototypes,
+  the camera rig and a physics ground (verified with usd-core); a runner script for Isaac Sim
+  4.x/5.x that streams the traffic simulation into the stage (not run). See its README.
+
+## Assets
+
+Vehicles, people, street furniture, construction props and some buildings are Poly Pizza
+models (`assets/polypizza_manifest.json`): 32 CC0 (Quaternius, Kenney, Kay Lousberg) and 12
+CC-BY 3.0, credited by `python -m metatraffic3d assets credits` and in `CREDITS.md`. They are
+downloaded on demand into `~/.cache/metatraffic3d/polypizza`; without them every asset has a
+procedural fallback. Two Poly Pizza MCP servers exist (HaD0Yun/poly-pizza-mcp,
+MatthewHallCom/Poly-Pizza-MCP) for searching with an API key; they are not needed here.
+
+## Limitations
+
+* The Isaac Sim runner has not been run (no NVIDIA GPU here); the USD export is tested.
+* Traffic is a lane-based microsimulation: cars cannot overtake through the oncoming lane, so a
+  double-parked van on a one-lane street holds traffic until it leaves.
+* The expert uses privileged state; the learned policy only sees cameras and its own state.
+* MuJoCo renders with simple lighting and no textures; this is not photorealistic, so a
+  real-world transfer needs domain randomisation or a better renderer (Isaac/RTX).
+* The highway is experimental: only one viaduct per city, with ramps at its two ends.
