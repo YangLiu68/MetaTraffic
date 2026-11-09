@@ -15,6 +15,22 @@ The system focuses on **environment design, simulation dynamics, and agent inter
 </p>
 
 
+## MetaTraffic 3D
+
+[`metatraffic3d/`](metatraffic3d/README.md) turns the generated 2D maps into seeded 3D cities
+(terrain, districts, buildings, water, bridges, traffic lights, pedestrians, incidents, weather)
+with two simulator backends (MuJoCo, tested; Isaac Sim via USD, export tested). It adds a
+camera-only end-to-end driving setup (physical car with direct steer/throttle/brake/gear
+control, 8-camera rig, time-aware transformer policy pre-trained by imitation and fine-tuned
+with RL) and a multi-agent taxi fleet trained with MAPPO.
+
+```bash
+pip install -e ".[mujoco,learn,assets]"
+python -m metatraffic3d drive-demo --seed 7 --weather rain --seconds 60 --out demo.mp4
+```
+
+<p align="center"><img src="docs/images/cities.jpg" width="720"/></p>
+
 ## Overview
 
 Most RL environments assume either:

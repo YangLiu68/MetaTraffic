@@ -14,7 +14,7 @@ On top of the city there are two learning setups:
 * **Multi-agent taxi fleet.** Every taxi is an agent that picks passengers and routes through
   congestion (MAPPO with a centralised critic).
 
-![multi-camera demo](../docs/images/demo_clear.jpg)
+![multi-camera demo: 8 car cameras around a chase view](../docs/images/demo_multicam.jpg)
 
 ## Quick start
 
