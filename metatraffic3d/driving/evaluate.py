@@ -89,7 +89,8 @@ def main(argv=None) -> None:
                 row = run_episode(env, drv, seed, a.max_steps)
                 row.update(map=map_seed, ep=ep)
                 results[name].append(row)
-                print(f"{os.path.basename(name)} map {map_seed} ep {ep}: {row['reason']} completion {row['completion']:.2f} "
+                label = os.path.basename(os.path.dirname(name)) if name.endswith(".pt") else name
+                print(f"{label} map {map_seed} ep {ep}: {row['reason']} completion {row['completion']:.2f} "
                       f"{row['km']:.2f} km collisions {row['collision']} red {row['red_light']} "
                       f"[{time.time() - t0:.0f}s]", flush=True)  # fmt: skip
     summary = {name: summarize(rows) for name, rows in results.items()}

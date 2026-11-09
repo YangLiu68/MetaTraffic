@@ -5,7 +5,9 @@
 * ``--driver expert``: the expert drives; DART-style noise is added to the executed action so
   the data shows how to recover from small mistakes (the label is always the clean action).
 * ``--driver policy --checkpoint ...``: a learned policy drives and the expert labels every
-  state (DAgger): the data then covers the states the policy itself reaches.
+  state (DAgger): the data then covers the states the policy itself reaches. With ``--beta``
+  the expert takes over for random stretches (~``--segment`` seconds) a ``beta`` share of the
+  time, so episodes do not all end in the policy's first mistake.
 
 Each episode is one ``.npz``: JPEG bytes of every camera frame (flattened + offsets), state,
 command, expert controls and gear, and per-step metadata.
@@ -27,22 +29,28 @@ from .env import DrivingEnv
 from .jpeg import decode, encode  # noqa: F401  (re-exported)
 
 
-def record_episode(env: DrivingEnv, seed: int, noise: float, policy=None, max_steps: int = 2400) -> dict:
+def record_episode(env: DrivingEnv, seed: int, noise: float, policy=None, max_steps: int = 2400,
+                   beta: float = 0.0, segment: float = 3.0) -> dict:  # fmt: skip
     rng = np.random.default_rng(seed)
     env.expert.noise = noise
     env.expert.rng = rng
     obs, info = env.reset(seed=seed)
     if policy is not None and hasattr(policy, "reset"):
         policy.reset()
-    frames, states, commands, controls, gears, meta = [], [], [], [], [], []
+    frames, states, commands, controls, gears, meta, by_policy = [], [], [], [], [], [], []
     reason = None
+    expert_turn = policy is None or rng.random() < beta
     for _ in range(max_steps):
         label = env.expert_action()
-        if policy is not None:
-            act = policy(obs)
-        else:
+        pol = policy(obs) if policy is not None else None  # called every step to keep its frame history
+        if policy is not None and rng.random() < env.dt / segment:  # hand over now and then
+            expert_turn = rng.random() < beta
+        if expert_turn:
             c = env.expert.noisy((*label["control"], label["gear"]))
             act = {"control": np.array(c[:3], np.float32), "gear": c[3]}
+        else:
+            act = pol
+        by_policy.append(not expert_turn)
         frames.append([encode(im) for im in obs["images"]])
         states.append(obs["state"])
         commands.append(obs["command"])
@@ -60,6 +68,7 @@ def record_episode(env: DrivingEnv, seed: int, noise: float, policy=None, max_st
         "state": np.array(states, np.float32), "command": np.array(commands, np.float32),
         "control": np.array(controls, np.float32), "gear": np.array(gears, np.int64),
         "reward": np.array([m[0] for m in meta], np.float32), "reason": str(reason),
+        "by_policy": np.array(by_policy, bool),
         "weather": env.weather, "infractions": json.dumps(info["privileged"]["infractions"]),
     }  # fmt: skip
 
@@ -74,6 +83,10 @@ def main(argv=None) -> None:
     ap.add_argument("--checkpoint", default=None)
     ap.add_argument("--max-steps", type=int, default=1800)
     ap.add_argument("--start", type=int, default=0, help="first episode index (to resume)")
+    ap.add_argument("--beta", type=float, default=0.0, help="DAgger: share of time the expert drives")
+    ap.add_argument("--segment", type=float, default=3.0, help="DAgger: mean seconds between hand-overs")
+    ap.add_argument("--noise-policy", type=float, default=0.15, help="DART noise on expert stretches in DAgger")
+    ap.add_argument("--tag", default=None, help="file name tag (default: the driver)")
     a = ap.parse_args(argv)
     os.makedirs(a.out, exist_ok=True)
     policy = None
@@ -88,15 +101,16 @@ def main(argv=None) -> None:
         world = build_world(cfg, assets=assets)
         env = DrivingEnv(cfg, world, assets=assets, seed=map_seed)
         for ep in range(a.start, a.start + a.episodes):
-            path = os.path.join(a.out, f"map{map_seed}_{a.driver}_ep{ep:04d}.npz")
+            path = os.path.join(a.out, f"map{map_seed}_{a.tag or a.driver}_ep{ep:04d}.npz")
             if os.path.exists(path):
                 continue
             t0 = time.time()
-            rec = record_episode(env, seed=map_seed * 1000 + ep, noise=a.noise if a.driver == "expert" else 0.0,
-                                 policy=policy, max_steps=a.max_steps)  # fmt: skip
+            rec = record_episode(env, seed=map_seed * 1000 + ep + (5000 if policy is not None else 0),
+                                 noise=a.noise if a.driver == "expert" else a.noise_policy, policy=policy,
+                                 max_steps=a.max_steps, beta=a.beta, segment=a.segment)  # fmt: skip
             np.savez(path, **rec)
             n = len(rec["state"])
-            print(f"map {map_seed} ep {ep}: {n} steps, {rec['reason']}, {rec['weather']}, "
+            print(f"map {map_seed} ep {ep}: {n} steps ({rec['by_policy'].mean():.0%} policy), {rec['reason']}, {rec['weather']}, "
                   f"{n / (time.time() - t0):.1f} steps/s, {os.path.getsize(path) / 1e6:.1f} MB", flush=True)  # fmt: skip
 
 

@@ -87,19 +87,49 @@ def make_head(n_cams: int, state_dim: int = 12, cmd_dim: int = N_COMMANDS + 1, f
             idx = command[:, :N_COMMANDS].argmax(1)
             sel = out[torch.arange(b), idx]
             raw = sel[:, :3]
+            self.last_pedal_logits = raw[:, 1:3]  # for a loss that never saturates (see bc_loss)
             mean = torch.stack([torch.tanh(raw[:, 0]), torch.sigmoid(raw[:, 1]), torch.sigmoid(raw[:, 2])], dim=1)
             return mean, sel[:, 3:], self.value(h).squeeze(-1)
 
     return Head()
 
 
-def bc_loss(mean, gear_logits, control, gear):
+def keyframe_weights(state, control, gear):
+    """Extra weight for the rare moments where the expert *changes* what it is doing.
+
+    Copying the current gear or the current speed trend is right on almost every step, so a
+    cloned policy learns to copy and never shifts or brakes on its own (the "copycat" problem of
+    behaviour cloning from histories). Up-weighting gear changes, braking while moving and
+    pulling away from a stop makes those decisions count. ``state`` is the current (B, 12) state.
+    """
+    torch, _ = _torch()
+    cur_gear = state[:, 2:2 + N_GEARS].argmax(1)
+    speed = state[:, 0] * 15.0
+    w_gear = 1.0 + 9.0 * (gear != cur_gear).float()
+    braking = (control[:, 2] > 0.1) & (speed > 1.0)
+    pulling_away = (control[:, 1] > 0.05) & (speed < 0.5)
+    w_ctl = 1.0 + 4.0 * (braking | pulling_away).float()
+    return w_ctl, w_gear
+
+
+def bc_loss(mean, gear_logits, control, gear, w_ctl=None, w_gear=None, pedal_logits=None):
+    """Imitation loss. With ``pedal_logits`` the throttle and brake use binary cross-entropy on
+    the logits: an L1 loss on sigmoid outputs drives a mostly-zero target (the brake) deep into
+    the flat end of the sigmoid, where its gradient vanishes and the output can never recover."""
     torch, nn = _torch()
     l_steer = (mean[:, 0] - control[:, 0]).abs()
     l_pedal = (mean[:, 1:] - control[:, 1:]).abs().sum(1)
+    if pedal_logits is not None:
+        l_fit = nn.functional.binary_cross_entropy_with_logits(pedal_logits, control[:, 1:], reduction="none").sum(1)
+    else:
+        l_fit = l_pedal
     weight = 1.0 + 3.0 * (control[:, 0].abs() > 0.08).float()  # turns are rarer than straight driving
+    if w_ctl is not None:
+        weight = weight * w_ctl
     l_gear = nn.functional.cross_entropy(gear_logits, gear, reduction="none")
-    loss = (weight * (2.0 * l_steer + l_pedal) + 0.2 * l_gear).mean()
+    if w_gear is not None:
+        l_gear = l_gear * w_gear
+    loss = (weight * (2.0 * l_steer + l_fit) + 0.2 * l_gear).mean()
     acc = (gear_logits.argmax(1) == gear).float().mean()
     return loss, {"steer_l1": float(l_steer.mean()), "pedal_l1": float(l_pedal.mean()), "gear_acc": float(acc)}
 
@@ -107,10 +137,11 @@ def bc_loss(mean, gear_logits, control, gear):
 class PolicyRunner:
     """Callable policy for the env: obs -> action dict (deterministic means, argmax gear)."""
 
-    def __init__(self, head, encoder: Encoder, pca=None) -> None:
+    def __init__(self, head, encoder: Encoder, pca=None, jpeg: bool = True) -> None:
         self.head = head.to(encoder.dev).eval()
         self.enc = encoder
         self.pca = pca
+        self.jpeg = jpeg  # training frames were JPEG-compressed; match that at run time
 
     def reset(self) -> None:
         pass
@@ -118,7 +149,9 @@ class PolicyRunner:
     def __call__(self, obs: dict) -> dict:
         torch, _ = _torch()
         dev = self.enc.dev
-        feats = self.enc(obs["images"][None])
+        from .jpeg import roundtrip
+
+        feats = self.enc((roundtrip(obs["images"]) if self.jpeg else obs["images"])[None])
         if self.pca is not None:
             feats = self.pca(feats)
         st = torch.as_tensor(obs["state"][None], device=dev)

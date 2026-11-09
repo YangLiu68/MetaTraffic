@@ -129,6 +129,7 @@ def make_driveformer(n_cams: int = 4, d: int = 256, layers: int = 4, heads: int 
             qa, qc, qv = h[:, -3], h[:, -2], h[:, -1]
             out = self.act_head(qa)
             raw = out[:, :3]
+            self.last_pedal_logits = raw[:, 1:3]  # for a loss that never saturates (see bc_loss)
             mean = torch.stack([torch.tanh(raw[:, 0]), torch.sigmoid(raw[:, 1]), torch.sigmoid(raw[:, 2])], dim=1)
             ch = self.chunk_head(qc).view(b, HORIZON, 3)
             chunk = torch.stack([torch.tanh(ch[..., 0]), torch.sigmoid(ch[..., 1]), torch.sigmoid(ch[..., 2])], dim=-1)
@@ -175,10 +176,11 @@ def chunk_loss(chunk, target, mask):
 class TransformerRunner:
     """Callable policy for the env with its own frame history (call ``reset()`` per episode)."""
 
-    def __init__(self, model, encoder: SpatialEncoder, pca: PCA | None = None) -> None:
+    def __init__(self, model, encoder: SpatialEncoder, pca: PCA | None = None, jpeg: bool = True) -> None:
         self.model = model.to(encoder.dev).eval()
         self.enc = encoder
         self.pca = pca
+        self.jpeg = jpeg  # training frames were JPEG-compressed; match that at run time
         self.reset()
 
     def reset(self) -> None:
@@ -188,7 +190,10 @@ class TransformerRunner:
     def __call__(self, obs: dict) -> dict:
         torch, _ = _torch()
         dev = self.enc.dev
-        f = self.enc(obs["images"][None])[0]  # (N, 15, 512)
+        from .jpeg import roundtrip
+
+        images = roundtrip(obs["images"]) if self.jpeg else obs["images"]
+        f = self.enc(images[None])[0]  # (N, 15, 512)
         self.frames.append(self.pca(f) if self.pca is not None else f)
         self.states.append(torch.as_tensor(obs["state"], device=dev))
         t = len(self.frames) - 1

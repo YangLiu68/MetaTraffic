@@ -23,6 +23,7 @@ from ..assets import AssetLibrary
 from ..config import SimConfig
 from ..world import build_world
 from .env import DrivingEnv
+from .jpeg import roundtrip
 from .policy import bc_loss, device
 from .transformer import HIST, PCA, STRIDE, SpatialEncoder, history_index, make_driveformer
 
@@ -86,7 +87,7 @@ def main(argv=None) -> None:
     total = 0
 
     def encode(o):
-        f = enc(o["images"][None])[0]
+        f = enc(roundtrip(o["images"])[None])[0]  # JPEG round trip, like the recorded training frames
         return (pca(f) if pca is not None else f).half().cpu()
 
     cur = hist.push(encode(obs), obs["state"])
@@ -176,7 +177,7 @@ def main(argv=None) -> None:
                 ratio = (logp - LP[b]).exp()
                 pg = -torch.min(ratio * ADV[b], ratio.clamp(0.8, 1.2) * ADV[b]).mean()
                 vl = ((v - RET[b]) ** 2).mean()
-                bcl, _ = bc_loss(mean, gl, EC[b], EG[b])
+                bcl, _ = bc_loss(mean, gl, EC[b], EG[b], pedal_logits=model.last_pedal_logits)
                 loss = pg + 0.5 * vl + a.bc_coef * bcl - 0.001 * dist.entropy().sum(1).mean()
                 opt.zero_grad()
                 loss.backward()

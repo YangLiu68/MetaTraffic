@@ -16,3 +16,8 @@ def encode(img: np.ndarray, quality: int = 88) -> bytes:
 
 def decode(b: bytes) -> np.ndarray:
     return np.asarray(Image.open(io.BytesIO(b)).convert("RGB"))
+
+
+def roundtrip(images: np.ndarray, quality: int = 88) -> np.ndarray:
+    """Compress and decompress camera images (N, H, W, 3) the way recorded training frames were."""
+    return np.stack([decode(encode(im, quality)) for im in images])

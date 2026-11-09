@@ -73,3 +73,17 @@ def test_checkpointed_training_pass_matches_plain_pass():
         assert torch.allclose(a, b, atol=1e-5)
     out[0].sum().backward()
     assert m.encoder.layers[0].linear1.weight.grad is not None
+
+
+def test_pedal_loss_recovers_from_a_saturated_brake():
+    from metatraffic3d.driving.policy import bc_loss
+
+    logits = torch.tensor([[0.0, -30.0]], requires_grad=True)  # brake squashed deep into sigmoid's flat end
+    mean = torch.stack([torch.zeros(1), torch.sigmoid(logits[:, 0]), torch.sigmoid(logits[:, 1])], dim=1)
+    target = torch.tensor([[0.0, 0.0, 1.0]])
+    gear_logits, gear = torch.zeros(1, 7), torch.tensor([3])
+    bc_loss(mean, gear_logits, target, gear)[0].backward(retain_graph=True)
+    assert abs(float(logits.grad[0, 1])) < 1e-9  # L1 on the sigmoid output: no signal at all
+    logits.grad = None
+    bc_loss(mean, gear_logits, target, gear, pedal_logits=logits)[0].backward()
+    assert float(logits.grad[0, 1]) < -0.5  # cross-entropy on the logit: full-strength push to brake
