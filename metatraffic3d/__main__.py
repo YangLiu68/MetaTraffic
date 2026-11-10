@@ -89,6 +89,7 @@ def main(argv=None) -> int:
     ap.add_argument("--weather", default="clear")
     ap.add_argument("--seconds", type=float, default=60.0)
     ap.add_argument("--episode", type=int, default=1)
+    ap.add_argument("--policy", default=None, help="drive-demo: a learned driver's checkpoint, on evaluation route --episode")
     a = ap.parse_args(rest)
     from .assets import AssetLibrary
     from .world import build_world
@@ -115,8 +116,12 @@ def main(argv=None) -> int:
         w = build_world(_cfg(a), assets=assets)
         print(json.dumps(export_usd(w, a.out or f"city_seed{a.seed}.usd", assets), indent=1, default=str))
     elif cmd == "drive-demo":
-        from .driving.demo import record
+        from .driving.demo import record, record_policy
 
+        if a.policy:
+            record_policy(a.out or f"policy_seed{a.seed}_ep{a.episode}.mp4", a.policy, seed=a.seed,
+                          episode=a.episode, seconds=a.seconds)
+            return 0
         record(a.out or f"demo_seed{a.seed}.mp4", seed=a.seed, weather=a.weather, seconds=a.seconds,
                episode_seed=a.episode, terrain=a.terrain)  # fmt: skip
     else:
