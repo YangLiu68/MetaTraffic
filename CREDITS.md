@@ -2,7 +2,7 @@
 
 ## Road layout generator
 
-`mapgen/` is a Python port of [ProbableTrain/MapGenerator](https://github.com/ProbableTrain/MapGenerator) (LGPL-3.0); the original TypeScript is in `MapGenerator/`.
+`mapgen/` is a Python port of [ProbableTrain/MapGenerator](https://github.com/ProbableTrain/MapGenerator) (LGPL-3.0); the original TypeScript is in `third_party/MapGenerator/`.
 
 ## 3D models (Poly Pizza)
 

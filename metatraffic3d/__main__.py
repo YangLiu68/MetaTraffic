@@ -89,7 +89,7 @@ def main(argv=None) -> int:
     ap.add_argument("--weather", default="clear")
     ap.add_argument("--seconds", type=float, default=60.0)
     ap.add_argument("--episode", type=int, default=1)
-    ap.add_argument("--policy", default=None, help="drive-demo: a learned driver's checkpoint, on evaluation route --episode")
+    ap.add_argument("--policy", default=None, help="drive-demo: record an agent checkpoint instead of the autopilot, on evaluation route --episode")
     a = ap.parse_args(rest)
     from .assets import AssetLibrary
     from .world import build_world

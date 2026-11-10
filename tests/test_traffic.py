@@ -84,6 +84,6 @@ def test_construction_never_picks_a_lane_too_short_for_the_zone(small_world, mon
         z = inc._start("construction")
         if z is None:
             continue
-        for lane, (a, b) in z.lanes:
+        for lane, (_a, b) in z.lanes:
             assert lane not in short and b <= net.lanes[lane].length
         inc._finish(z)

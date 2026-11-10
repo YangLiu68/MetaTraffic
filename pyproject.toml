@@ -1,14 +1,24 @@
 [project]
 name = "metatraffic"
-version = "0.2.0"
-description = "Procedural 3D cities for self-driving and multi-agent traffic RL (MuJoCo and Isaac Sim backends)"
+version = "0.3.0"
+description = "Procedural 3D city simulator and reinforcement-learning environments for autonomous driving and multi-agent traffic (MuJoCo, Isaac Sim)"
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "LGPL-3.0-or-later" }
+license = { text = "MIT AND LGPL-3.0-only" }  # LGPL-3.0 for mapgen/ (port of MapGenerator); see LICENSE
+authors = [{ name = "Yang Liu" }]
+keywords = ["reinforcement-learning", "simulation", "autonomous-driving", "multi-agent", "mujoco", "isaac-sim", "procedural-generation", "traffic"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Physics",
+]
 dependencies = ["numpy>=1.24", "shapely>=2.1", "pillow>=10.0"]
 
+[project.urls]
+Homepage = "https://github.com/YangLiu68/MetaTraffic"
+
 [project.optional-dependencies]
-mujoco = ["mujoco>=3.2"]
+mujoco = ["mujoco>=3.2", "gymnasium>=0.29"]
 learn = ["torch>=2.2", "torchvision>=0.17", "gymnasium>=0.29"]
 isaac = ["usd-core>=24.0"]
 assets = ["trimesh>=4.0"]

@@ -1,7 +1,7 @@
 """mapgen: procedural city maps in Python.
 
 A Python port of ProbableTrain/MapGenerator (https://github.com/ProbableTrain/MapGenerator),
-the TypeScript generator in ../MapGenerator. Roads are streamlines of a tensor field
+the TypeScript generator in ../third_party/MapGenerator. Roads are streamlines of a tensor field
 (Chen et al., "Interactive Procedural Street Modeling", 2008), then water, parks and building
 lots are added. Licensed under the LGPL-3.0, like the original (see COPYING.LESSER).
 

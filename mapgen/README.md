@@ -1,7 +1,7 @@
 # mapgen: procedural city maps in Python
 
 A Python port of [ProbableTrain/MapGenerator](https://github.com/ProbableTrain/MapGenerator)
-(TypeScript, in `../MapGenerator`). It produces the same kind of map and writes the same SVG
+(TypeScript, in `../third_party/MapGenerator`). It produces the same kind of map and writes the same SVG
 format, so MetaTraffic loads the output directly.
 
 How it works (same pipeline as the original):
@@ -25,7 +25,7 @@ python -m mapgen --seed 7 -o map.svg --png map.png
 from mapgen import CityConfig, generate_city, to_svg
 
 city = generate_city(CityConfig(seed=7))
-svg_text = to_svg(city)  # e.g. DrivingEnv(svg_text) in RL/
+svg_text = to_svg(city)  # e.g. DrivingEnv(svg_text) in legacy2d/rl/
 ```
 
 The same seed always gives the same map. A full map takes about 3 seconds.
