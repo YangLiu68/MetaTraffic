@@ -9,8 +9,14 @@ labels for the visited states (``--bc-coef``) keeps the policy from forgetting h
 while RL improves it (as in DAPG / BC-regularised PPO). Episodes cut off by the time limit are
 bootstrapped from the value of their last observation. The value head was never trained by
 behaviour cloning, so the first ``--critic-warmup`` rollouts fit only the value (and BC) terms
-before any policy-gradient step. As at run time, only the larger sampled pedal is applied
-(``policy.pick_one_pedal``); the noise would otherwise keep both pressed.
+before any policy-gradient step.
+
+Exploration uses the action the policy takes at run time. That action keeps only the larger of
+throttle and brake (``policy.pick_one_pedal``), so RL samples two numbers: the steering and one
+signed pedal (+throttle / -brake) around that action. Sampling throttle and brake separately
+let the noise press a pedal whose mean is zero half of the time, so random brake taps had to be
+beaten with more throttle, and without the noise the policy then drove too fast. The gear is
+not explored: the most likely gear is used and only the imitation term trains it.
 """
 
 from __future__ import annotations
@@ -27,8 +33,24 @@ from ..config import SimConfig
 from ..world import build_world
 from .env import DrivingEnv
 from .jpeg import roundtrip
-from .policy import bc_loss, device, pick_one_pedal
+from .policy import bc_loss, device
 from .transformer import HIST, PCA, STRIDE, SpatialEncoder, history_index, make_driveformer
+
+
+def action_dist(mean, log_std):
+    """Gaussian over (steer, signed pedal) centred on the run-time action: the larger pedal,
+    as +throttle or -brake."""
+    import torch
+
+    thr, brk = mean[:, 1], mean[:, 2]
+    loc = torch.stack([mean[:, 0], torch.where(thr >= brk, thr, -brk)], 1)
+    return torch.distributions.Normal(loc, log_std[:2].exp())
+
+
+def to_control(sample) -> np.ndarray:
+    """(steer, signed pedal) -> (steer, throttle, brake), one pedal at a time."""
+    steer, p = float(np.clip(sample[0], -1, 1)), float(np.clip(sample[1], -1, 1))
+    return np.array([steer, max(p, 0.0), max(-p, 0.0)], np.float32)
 
 
 class History:
@@ -64,7 +86,10 @@ def main(argv=None) -> None:
     ap.add_argument("--gamma", type=float, default=0.99)
     ap.add_argument("--critic-warmup", type=int, default=2, help="rollouts that train only value + BC")
     ap.add_argument("--minibatch", type=int, default=32, help="PPO minibatch (memory: attention over ~250 tokens)")
+    ap.add_argument("--init-std", type=float, default=0.1, help="starting exploration std (steer, pedal)")
     a = ap.parse_args(argv)
+    import math
+
     import torch
 
     os.makedirs(a.out, exist_ok=True)
@@ -73,6 +98,8 @@ def main(argv=None) -> None:
     assert ck.get("arch") == "transformer", "RL fine-tuning expects a DriveFormer checkpoint"
     model = make_driveformer(ck["n_cams"], feat_dim=ck.get("feat_dim", 512)).to(dev)
     model.load_state_dict(ck["model"])
+    with torch.no_grad():
+        model.log_std.fill_(math.log(a.init_std))
     enc = SpatialEncoder(dev)
     pca = PCA(ck["pca_mean"], ck["pca_comp"]) if "pca_comp" in ck else None
     opt = torch.optim.Adam(model.parameters(), lr=a.lr)
@@ -97,7 +124,7 @@ def main(argv=None) -> None:
 
     cur = hist.push(encode(obs), obs["state"])
     while total < a.steps:
-        keys = ("img", "ages", "states", "cmd", "act", "gear", "logp", "val", "rew", "done", "term", "boot", "e_ctl", "e_gear")
+        keys = ("img", "ages", "states", "cmd", "act", "logp", "val", "rew", "done", "term", "boot", "e_ctl", "e_gear")
         buf = {k: [] for k in keys}
         model.eval()
         for _ in range(a.rollout):
@@ -105,14 +132,11 @@ def main(argv=None) -> None:
             cm = torch.as_tensor(obs["command"])
             with torch.no_grad():
                 mean, gl, _, v = model(img[None].float().to(dev), ages[None].to(dev), st[None].to(dev), cm[None].to(dev))
-                dist = torch.distributions.Normal(mean, model.log_std.exp())
+                dist = action_dist(mean, model.log_std)
                 act = dist.sample()
-                gdist = torch.distributions.Categorical(logits=gl)
-                gear = gdist.sample()
-                logp = dist.log_prob(act).sum(1) + gdist.log_prob(gear)
-            a_np = act[0].cpu().numpy()
-            ctl = pick_one_pedal(np.array([np.clip(a_np[0], -1, 1), np.clip(a_np[1], 0, 1), np.clip(a_np[2], 0, 1)]))
-            obs2, r, term, trunc, info = env.step({"control": ctl, "gear": int(gear.item())})
+                logp = dist.log_prob(act).sum(1)
+                gear = int(gl[0].argmax().item())
+            obs2, r, term, trunc, info = env.step({"control": to_control(act[0].cpu().numpy()), "gear": gear})
             ex = info["privileged"]["expert"]
             nxt = hist.push(encode(obs2), obs2["state"])
             boot = 0.0
@@ -123,7 +147,7 @@ def main(argv=None) -> None:
                                         torch.as_tensor(obs2["command"])[None].to(dev))  # fmt: skip
                 boot = float(vb.item())
             for k, val in (("img", img), ("ages", ages), ("states", st), ("cmd", cm), ("act", act[0].cpu()),
-                           ("gear", gear[0].cpu()), ("logp", logp[0].cpu()), ("val", v[0].cpu()), ("rew", r),
+                           ("logp", logp[0].cpu()), ("val", v[0].cpu()), ("rew", r),
                            ("done", term or trunc), ("term", term), ("boot", boot), ("e_ctl", ex["control"]),
                            ("e_gear", ex["gear"])):  # fmt: skip
                 buf[k].append(val)
@@ -163,7 +187,7 @@ def main(argv=None) -> None:
         IMG = torch.stack(buf["img"])  # (R, T, N, 15, 512) float16 on CPU
         AG, ST = torch.stack(buf["ages"]).to(dev), torch.stack(buf["states"]).to(dev)
         CM = torch.stack(buf["cmd"]).to(dev)
-        A, G, LP = torch.stack(buf["act"]).to(dev), torch.stack(buf["gear"]).to(dev), torch.stack(buf["logp"]).to(dev)
+        A, LP = torch.stack(buf["act"]).to(dev), torch.stack(buf["logp"]).to(dev)
         ADV = torch.as_tensor(adv, device=dev)
         ADV = (ADV - ADV.mean()) / (ADV.std() + 1e-8)
         RET = torch.as_tensor(ret, device=dev)
@@ -177,9 +201,8 @@ def main(argv=None) -> None:
             for i in range(0, len(perm), a.minibatch):
                 b = perm[i:i + a.minibatch]
                 mean, gl, _, v = model(IMG[b].float().to(dev), AG[b], ST[b], CM[b])
-                dist = torch.distributions.Normal(mean, model.log_std.exp())
-                gd = torch.distributions.Categorical(logits=gl)
-                logp = dist.log_prob(A[b]).sum(1) + gd.log_prob(G[b])
+                dist = action_dist(mean, model.log_std)
+                logp = dist.log_prob(A[b]).sum(1)
                 ratio = (logp - LP[b]).exp()
                 pg = -torch.min(ratio * ADV[b], ratio.clamp(0.8, 1.2) * ADV[b]).mean()
                 vl = ((v - RET[b]) ** 2).mean()
@@ -197,7 +220,7 @@ def main(argv=None) -> None:
                "mean_return_10": float(np.mean([e["return"] for e in recent])) if recent else None,
                "arrived_10": float(np.mean([e["reason"] == "arrived" for e in recent])) if recent else None,
                "pg": float(np.mean([s[0] for s in stats])), "v": float(np.mean([s[1] for s in stats])),
-               "bc": float(np.mean([s[2] for s in stats])), "std": model.log_std.exp().tolist()}  # fmt: skip
+               "bc": float(np.mean([s[2] for s in stats])), "std": model.log_std[:2].exp().tolist()}  # fmt: skip
         log.append(row)
         print(json.dumps(row), flush=True)
         torch.save({"arch": "transformer", "model": {k: v.detach().cpu() for k, v in model.state_dict().items()},

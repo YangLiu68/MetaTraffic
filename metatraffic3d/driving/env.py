@@ -39,6 +39,7 @@ from .expert import ExpertDriver
 
 COMMANDS = ("follow", "left", "right", "straight", "uturn", "arrive")
 DEFAULT_CAMERAS = ("front_main", "pillar_left", "pillar_right", "rear")
+NO_ROUTE = 1e4  # "remaining distance" when no route to the destination exists
 WEATHER_P = {"clear": 0.4, "overcast": 0.15, "dusk": 0.12, "night": 0.13, "rain": 0.12, "fog": 0.08}
 
 
@@ -163,7 +164,8 @@ class DrivingEnv:
         self.offroad_time = 0.0
         self.weather = weather
         self.episode += 1
-        self._prev_remaining = self._remaining()
+        self._prev_remaining = self._route_m = self._remaining()
+        self._prev_hits: set[str] = set()
         self.ego_vehicle = v
         return self._observe(), self._info(None)
 
@@ -200,7 +202,7 @@ class DrivingEnv:
         ctg = self.sim.ctg(v)
         path = r.path(de, ctg, dest_de, max_len=200)
         if path[-1] != dest_de:
-            return 1e4
+            return NO_ROUTE
         total = r.length[r.index[de]] - s + sum(r.length[r.index[d]] for d in path[1:-1]) + dest_s
         return float(total)
 
@@ -236,14 +238,24 @@ class DrivingEnv:
         z_rel = st.z - float(self.world.terrain.height(st.x, st.y))
         self.tracker.update(st.x, st.y, st.yaw, st.speed, self.dt, z_rel)
         tr = self.tracker
-        for kind in hits:
+        for kind in hits - self._prev_hits:  # one collision per contact, not one per step of it
             tr.inf.add("collision", sim.time, with_=kind)
+        self._prev_hits = hits
+        # Progress along the route. A wrong turn lengthens the route left, and that is charged in
+        # full (up to 100 m): capped at 5 m it would cost almost nothing. Gains are capped at 5 m
+        # per step (more than the car can drive) against jumps when it is re-matched to a lane.
+        # Where no route exists the last known distance is kept, so a detour is charged on return.
         remaining = self._remaining()
-        progress = float(np.clip(self._prev_remaining - remaining, -5.0, 5.0))
-        self._prev_remaining = remaining
+        self._prev_remaining = remaining  # what the evaluation scores (no route left = 0 completion)
+        progress = 0.0
+        if remaining < NO_ROUTE:
+            progress = float(np.clip(self._route_m - remaining, -100.0, 5.0))
+            self._route_m = remaining
         self.offroad_time = self.offroad_time + self.dt if getattr(tr, "offroad", False) else 0.0
         reward = 0.1 * progress - 0.001 * abs(st.accel) - 0.002 * abs(st.yaw_rate)
-        penalties = {"collision": 10.0, "red_light": 3.0, "stop_sign": 1.5, "wrong_way": 0.5, "off_road": 0.3,
+        # Each penalty outweighs the time that breaking the rule saves: a full stop at a stop sign
+        # delays ~3 reward of progress, waiting out a red light up to ~9 (gamma 0.99).
+        penalties = {"collision": 20.0, "red_light": 10.0, "stop_sign": 5.0, "wrong_way": 0.5, "off_road": 0.3,
                      "speeding": 0.05, "route_deviation": 0.5}  # fmt: skip
         recent = [e for e in tr.inf.events if e["t"] >= sim.time - self.dt + 1e-6]
         reward -= sum(penalties.get(e["kind"], 0.0) for e in recent)

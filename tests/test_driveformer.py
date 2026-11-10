@@ -96,3 +96,17 @@ def test_one_pedal_rule_turns_half_pressed_pedals_into_a_decision():
     assert pick_one_pedal(np.array([0.0, 0.06, 0.15])).tolist() == pytest.approx([0.0, 0.0, 0.15])
     raw = np.array([0.0, 0.3, 0.0], np.float32)
     assert pick_one_pedal(raw) is not raw  # the network output is not changed in place
+
+
+def test_rl_explores_around_the_run_time_action_with_one_pedal():
+    pytest.importorskip("mujoco")
+    from metatraffic3d.driving.policy import pick_one_pedal
+    from metatraffic3d.driving.rl import action_dist, to_control
+
+    mean = torch.tensor([[0.1, 0.30, 0.02], [-0.2, 0.05, 0.40]])
+    d = action_dist(mean, torch.full((3,), -2.3))  # std 0.1
+    for i in range(2):  # without noise RL drives exactly as the policy does at run time
+        assert to_control(d.mean[i].numpy()).tolist() == pytest.approx(pick_one_pedal(mean[i].numpy()).tolist())
+    ctl = np.array([to_control(x) for x in d.sample((2000,))[:, 0].numpy()])
+    assert not ((ctl[:, 1] > 0) & (ctl[:, 2] > 0)).any()  # never both pedals
+    assert (ctl[:, 2] > 0).mean() < 0.01  # noise (almost) never taps a brake whose mean is near 0
