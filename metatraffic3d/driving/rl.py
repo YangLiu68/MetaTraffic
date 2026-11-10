@@ -7,7 +7,10 @@ the action std are trained with PPO on the environment reward (route progress, c
 infraction penalties, collision and arrival terms). A behaviour-cloning term on the expert's
 labels for the visited states (``--bc-coef``) keeps the policy from forgetting how to drive
 while RL improves it (as in DAPG / BC-regularised PPO). Episodes cut off by the time limit are
-bootstrapped from the value of their last observation.
+bootstrapped from the value of their last observation. The value head was never trained by
+behaviour cloning, so the first ``--critic-warmup`` rollouts fit only the value (and BC) terms
+before any policy-gradient step. As at run time, only the larger sampled pedal is applied
+(``policy.pick_one_pedal``); the noise would otherwise keep both pressed.
 """
 
 from __future__ import annotations
@@ -24,7 +27,7 @@ from ..config import SimConfig
 from ..world import build_world
 from .env import DrivingEnv
 from .jpeg import roundtrip
-from .policy import bc_loss, device
+from .policy import bc_loss, device, pick_one_pedal
 from .transformer import HIST, PCA, STRIDE, SpatialEncoder, history_index, make_driveformer
 
 
@@ -59,6 +62,8 @@ def main(argv=None) -> None:
     ap.add_argument("--lr", type=float, default=5e-5)
     ap.add_argument("--bc-coef", type=float, default=0.5)
     ap.add_argument("--gamma", type=float, default=0.99)
+    ap.add_argument("--critic-warmup", type=int, default=2, help="rollouts that train only value + BC")
+    ap.add_argument("--minibatch", type=int, default=32, help="PPO minibatch (memory: attention over ~250 tokens)")
     a = ap.parse_args(argv)
     import torch
 
@@ -106,7 +111,7 @@ def main(argv=None) -> None:
                 gear = gdist.sample()
                 logp = dist.log_prob(act).sum(1) + gdist.log_prob(gear)
             a_np = act[0].cpu().numpy()
-            ctl = np.array([np.clip(a_np[0], -1, 1), np.clip(a_np[1], 0, 1), np.clip(a_np[2], 0, 1)], np.float32)
+            ctl = pick_one_pedal(np.array([np.clip(a_np[0], -1, 1), np.clip(a_np[1], 0, 1), np.clip(a_np[2], 0, 1)]))
             obs2, r, term, trunc, info = env.step({"control": ctl, "gear": int(gear.item())})
             ex = info["privileged"]["expert"]
             nxt = hist.push(encode(obs2), obs2["state"])
@@ -165,11 +170,12 @@ def main(argv=None) -> None:
         EC = torch.as_tensor(np.array(buf["e_ctl"]), device=dev)
         EG = torch.as_tensor(np.array(buf["e_gear"]), device=dev)
         model.train()
+        warm = len(log) < a.critic_warmup  # value head still untrained: no policy-gradient step yet
         stats = []
         for _ in range(4):
             perm = torch.randperm(len(rews))
-            for i in range(0, len(perm), 64):
-                b = perm[i:i + 64]
+            for i in range(0, len(perm), a.minibatch):
+                b = perm[i:i + a.minibatch]
                 mean, gl, _, v = model(IMG[b].float().to(dev), AG[b], ST[b], CM[b])
                 dist = torch.distributions.Normal(mean, model.log_std.exp())
                 gd = torch.distributions.Categorical(logits=gl)
@@ -178,14 +184,16 @@ def main(argv=None) -> None:
                 pg = -torch.min(ratio * ADV[b], ratio.clamp(0.8, 1.2) * ADV[b]).mean()
                 vl = ((v - RET[b]) ** 2).mean()
                 bcl, _ = bc_loss(mean, gl, EC[b], EG[b], pedal_logits=model.last_pedal_logits)
-                loss = pg + 0.5 * vl + a.bc_coef * bcl - 0.001 * dist.entropy().sum(1).mean()
+                loss = 0.5 * vl + a.bc_coef * bcl
+                if not warm:
+                    loss = loss + pg - 0.001 * dist.entropy().sum(1).mean()
                 opt.zero_grad()
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)
                 opt.step()
                 stats.append((float(pg), float(vl), float(bcl)))
         recent = episodes[-10:]
-        row = {"steps": total, "wall_s": round(time.time() - t0), "episodes": len(episodes),
+        row = {"steps": total, "wall_s": round(time.time() - t0), "episodes": len(episodes), "warmup": warm,
                "mean_return_10": float(np.mean([e["return"] for e in recent])) if recent else None,
                "arrived_10": float(np.mean([e["reason"] == "arrived" for e in recent])) if recent else None,
                "pg": float(np.mean([s[0] for s in stats])), "v": float(np.mean([s[1] for s in stats])),
