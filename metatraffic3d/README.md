@@ -156,6 +156,11 @@ Closed loop on two unseen cities (maps 6 and 2, 5 routes of 300-800 m each, 150 
 | + one-pedal rule | 0.12 | 3.6 | 3 / 10 | 9 km/h |
 | + DAgger round 3 (8 cities, 4 of them new) | 0.18 | 1.0 | 1 / 10 | 11 km/h |
 | + DAgger round 4 (12 cities) | 0.21 | 1.2 | 2 / 10 | 8 km/h |
+| round 4 + RL, first run | 0.12 | 1.6 or more ¹ | 1 / 10 | 16 km/h |
+| round 4 + RL, second run (fixed exploration and reward) | 0.04 | 0.6 | 1 / 10 | 12 km/h |
+
+¹ That run predates counting a collision once per contact; one car pinned against construction
+cones logged a collision on every step, so its exact count is unknown.
 
 The cloned policies are not good drivers yet. Open loop they match the expert closely (steering
 error 0.02-0.03 on held-out expert episodes), but in closed loop they fail within a few hundred
@@ -165,8 +170,18 @@ each DAgger round, which labels the states the policy itself drives into, has he
 mostly stopped the wrong turns of round 3 (less distance, more of it along the route). One of
 the ten routes is blocked even for the expert (no progress in 150 s), and every policy leaves the
 road at the same spot on another. The expert
-itself runs into the 150 s limit on 8 of its 10 routes, hence 0.70. More DAgger rounds over more
-cities and the RL stage are the next steps.
+itself runs into the 150 s limit on 8 of its 10 routes, hence 0.70. Over 12 such routes the
+round-4 policy gets through 5 of the 8 turns it is asked to make cleanly and all 8 straight
+crossings (`drive-demo --policy` records any evaluation route as a video).
+
+RL fine-tuning (`rl`: PPO plus a behaviour-cloning term, 20k steps on 2 training cities) has so
+far made the round-4 policy worse. The first run drove twice as fast and ran stop signs: its
+exploration noise tapped the brake at random, PPO answered with more throttle, and without the
+noise at test time the car was too fast; the reward also made wrong turns and rule breaks cheap.
+With both fixed, the second run still left the road on 7 of 10 routes. About 50 episodes of
+experience are too few for PPO to improve a policy this fragile. Next to try: a penalty for
+drifting from the cloned policy (KL), updating only the output heads, or many more episodes;
+more DAgger rounds over more cities remain the step that has reliably helped.
 
 ## Multi-agent taxi fleet (`marl/`)
 
