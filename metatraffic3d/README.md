@@ -155,12 +155,16 @@ Closed loop on two unseen cities (maps 6 and 2, 5 routes of 300-800 m each, 150 
 | + DAgger round 2, motion dropout | 0.11 | 2.4 | 5 / 10 | 6 km/h |
 | + one-pedal rule | 0.12 | 3.6 | 3 / 10 | 9 km/h |
 | + DAgger round 3 (8 cities, 4 of them new) | 0.18 | 1.0 | 1 / 10 | 11 km/h |
+| + DAgger round 4 (12 cities) | 0.21 | 1.2 | 2 / 10 | 8 km/h |
 
 The cloned policies are not good drivers yet. Open loop they match the expert closely (steering
 error 0.02-0.03 on held-out expert episodes), but in closed loop they fail within a few hundred
 metres. The round-2 policy did about as badly on new routes in its training cities (completion
 0.13, stuck 4 of 6), so the gap is closed-loop robustness rather than new-city generalisation;
-each DAgger round, which labels the states the policy itself drives into, has helped. The expert
+each DAgger round, which labels the states the policy itself drives into, has helped. Round 4
+mostly stopped the wrong turns of round 3 (less distance, more of it along the route). One of
+the ten routes is blocked even for the expert (no progress in 150 s), and every policy leaves the
+road at the same spot on another. The expert
 itself runs into the 150 s limit on 8 of its 10 routes, hence 0.70. More DAgger rounds over more
 cities and the RL stage are the next steps.
 
